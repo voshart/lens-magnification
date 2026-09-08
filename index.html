@@ -17,7 +17,7 @@
       <a href="https://github.com/voshart/lens-magnification">source</a>
     </header>
 
-    <form class="controls" id="controls">
+    <div class="controls" id="controls">
       <label class="field field-system">
         <span>Camera / sensor</span>
         <select id="system" name="system"></select>
@@ -42,9 +42,9 @@
         <span>Sensor MP</span>
         <input id="megapixels" name="megapixels" type="number" value="45" min="1" max="200" step="0.1" inputmode="decimal">
       </label>
-    </form>
+    </div>
 
-    <section class="workspace" aria-live="polite">
+    <section class="workspace">
       <figure class="sensor-panel">
         <div class="sensor-frame" id="sensor-frame">
           <svg id="sensor-svg" viewBox="0 0 36 24" role="img" aria-labelledby="sensor-title sensor-desc">
@@ -69,32 +69,14 @@
 
       <aside class="readout">
         <dl class="primary-results">
-          <div>
-            <dt>Magnification</dt>
-            <dd id="out-mag">—</dd>
-          </div>
-          <div>
-            <dt>Field of view</dt>
-            <dd id="out-fov">—</dd>
-          </div>
-          <div>
-            <dt>Working distance</dt>
-            <dd id="out-wd">—</dd>
-          </div>
-          <div>
-            <dt>Sensor → subject</dt>
-            <dd id="out-total">—</dd>
-          </div>
-          <div>
-            <dt>Effective aperture</dt>
-            <dd id="out-effective">—</dd>
-          </div>
-          <div>
-            <dt>DOF <small>(2 px CoC)</small></dt>
-            <dd id="out-dof">—</dd>
-          </div>
+          <div><dt>Magnification</dt><dd id="out-mag">—</dd></div>
+          <div><dt>Field of view</dt><dd id="out-fov">—</dd></div>
+          <div><dt>Working distance</dt><dd id="out-wd">—</dd></div>
+          <div><dt>Sensor → subject</dt><dd id="out-total">—</dd></div>
+          <div><dt>Effective aperture</dt><dd id="out-effective">—</dd></div>
+          <div><dt>DOF <small>(2 px CoC)</small></dt><dd id="out-dof">—</dd></div>
         </dl>
-        <p class="status" id="status"></p>
+        <p class="status" id="status" role="status" aria-live="polite"></p>
       </aside>
     </section>
 

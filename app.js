@@ -1,6 +1,7 @@
 import {
   LENSES_BY_SYSTEM,
   MICROSCOPE_OBJECTIVES_DATA,
+  OPTIC_CATALOG,
   MACRO_ACCESSORIES_DATA,
   REFERENCE_OBJECTS
 } from './data.js';
@@ -70,6 +71,10 @@ function currentObjective() {
 
 function currentLens() {
   return currentSystem()?.lenses?.[elements.lens.value] ?? null;
+}
+
+function isZoomLens(lens) {
+  return Boolean(lens && /\d+(?:\.\d+)?[-–]\d+(?:\.\d+)?mm/i.test(lens.name));
 }
 
 function populateSystems() {
@@ -283,10 +288,11 @@ function renderRig(system, lensOrObjective, accessory, result) {
   let blocks;
 
   if (result.type === 'objective') {
-    const body = lensOrObjective.PL_obj_body_mm ?? 40;
+    const bodyKnown = Number.isFinite(lensOrObjective.PL_obj_body_mm) && lensOrObjective.PL_obj_body_mm > 0;
+    const body = bodyKnown ? lensOrObjective.PL_obj_body_mm : 40;
     blocks = [
       { label: `WD ${formatMm(result.workingDistanceMm, 1)}`, value: result.workingDistanceMm ?? 0, type: 'space' },
-      { label: `${lensOrObjective.M_obj}×`, value: body, type: 'block' },
+      { label: `${lensOrObjective.M_obj}×`, value: body, type: 'block', uncertain: !bodyKnown },
       { label: `${result.imageDistanceMm ?? 150} mm image distance`, value: result.imageDistanceMm ?? 150, type: 'space' }
     ];
   } else {
@@ -296,7 +302,7 @@ function renderRig(system, lensOrObjective, accessory, result) {
     const flange = system.flangeDistance ?? 18;
     blocks = [
       { label: wd == null ? 'WD unknown' : `WD ${formatMm(wd, 0)}`, value: wd ?? Math.max(lensLength * 0.8, 30), type: 'space', uncertain: wd == null },
-      { label: 'lens', value: lensLength, type: 'block' },
+      { label: 'lens', value: lensLength, type: 'block', uncertain: !lensOrObjective.PL },
       ...(extension > 0 ? [{ label: `${extension} mm`, value: extension, type: 'block' }] : []),
       { label: `${flange} mm`, value: flange, type: 'block' }
     ];
@@ -311,15 +317,15 @@ function renderRig(system, lensOrObjective, accessory, result) {
   ];
 
   blocks.forEach((item, index) => {
-    const width = widths[index];
+    const blockWidth = widths[index];
     if (item.type === 'space') {
-      pieces.push(`<line class="rig-line ${item.uncertain ? 'rig-dashed' : ''}" x1="${x}" y1="${y}" x2="${x + width}" y2="${y}"></line>`);
-      pieces.push(`<text class="rig-text-muted" text-anchor="middle" x="${x + width / 2}" y="${y - 9}">${svgEscape(item.label)}</text>`);
+      pieces.push(`<line class="rig-line ${item.uncertain ? 'rig-dashed' : ''}" x1="${x}" y1="${y}" x2="${x + blockWidth}" y2="${y}"></line>`);
+      pieces.push(`<text class="rig-text-muted" text-anchor="middle" x="${x + blockWidth / 2}" y="${y - 9}">${svgEscape(item.label)}</text>`);
     } else {
-      pieces.push(`<rect class="rig-block" x="${x}" y="${y - 15}" width="${width}" height="30"></rect>`);
-      pieces.push(`<text class="rig-text" text-anchor="middle" x="${x + width / 2}" y="${y + 4}">${svgEscape(item.label)}</text>`);
+      pieces.push(`<rect class="rig-block ${item.uncertain ? 'rig-dashed' : ''}" x="${x}" y="${y - 15}" width="${blockWidth}" height="30"></rect>`);
+      pieces.push(`<text class="rig-text" text-anchor="middle" x="${x + blockWidth / 2}" y="${y + 4}">${svgEscape(item.label)}</text>`);
     }
-    x += width;
+    x += blockWidth;
   });
 
   pieces.push(`<line class="rig-line" x1="${right}" y1="20" x2="${right}" y2="74"></line>`);
@@ -327,14 +333,58 @@ function renderRig(system, lensOrObjective, accessory, result) {
   elements.rigSvg.innerHTML = pieces.join('');
 }
 
-function renderResults(result, objective) {
+function catalogSummary(lens, objective) {
+  if (objective) {
+    return `${objective.M_obj}× · NA ${objective.NA} · WD ${formatMm(objective.WD_obj_mm, objective.WD_obj_mm < 10 ? 2 : 1)}`;
+  }
+  if (!lens) return '';
+
+  const bits = [`${formatMag(lens.NM)} max`];
+  if (!isZoomLens(lens)) {
+    if (Number.isFinite(lens.MFD) && lens.MFD > 0) bits.push(`MFD ${formatMm(lens.MFD, 0)}`);
+    if (Number.isFinite(lens.PL) && lens.PL > 0) bits.push(`length ${formatMm(lens.PL, 1)}`);
+  } else if (Number.isFinite(lens.maxMagnificationMFD) && lens.maxMagnificationMFD > 0) {
+    bits.push(`MFD at max ${formatMm(lens.maxMagnificationMFD, 0)}`);
+  }
+  return bits.join(' · ');
+}
+
+function catalogNodes(lens, objective) {
+  const entry = OPTIC_CATALOG[elements.lens.value];
+  if (!entry) {
+    const p = document.createElement('p');
+    p.textContent = 'Catalog source not yet independently verified; this entry still comes from the prototype dataset.';
+    return [p];
+  }
+
+  const p = document.createElement('p');
+  p.append('Catalog: ');
+  const a = document.createElement('a');
+  a.href = entry.url;
+  a.textContent = entry.label;
+  a.rel = 'external';
+  p.append(a);
+  const summary = catalogSummary(lens, objective);
+  if (summary) p.append(` · ${summary}`);
+
+  const nodes = [p];
+  if (entry.note) {
+    const note = document.createElement('p');
+    note.textContent = entry.note;
+    nodes.push(note);
+  }
+  return nodes;
+}
+
+function renderResults(result, objective, lens) {
   const out = elements.out;
+  const provenance = catalogNodes(lens, objective);
 
   if (!result.valid) {
     elements.imageCircleResult.hidden = true;
     for (const node of Object.values(out)) node.textContent = '—';
     elements.status.textContent = result.reason;
-    elements.notes.replaceChildren();
+    elements.notes.replaceChildren(...provenance);
     return;
   }
 
@@ -350,29 +400,28 @@ function renderResults(result, objective) {
   out.airyPx.textContent = result.airyPixels ? `${result.airyPixels.toFixed(1)} px` : '—';
   out.nyquist.textContent = result.nyquistLpMm ? `${result.nyquistLpMm.toFixed(0)} lp/mm` : '—';
 
-  elements.imageCircleResult.hidden = result.type !== 'objective';
-  if (result.type === 'objective') {
-    out.imageCircle.textContent = result.imageCircleMm
-      ? `${result.imageCircleMm.toFixed(0)} mm${result.vignette ? ' · vignettes' : ''}`
-      : '—';
+  elements.imageCircleResult.hidden = result.type !== 'objective' || !result.imageCircleMm;
+  if (result.type === 'objective' && result.imageCircleMm) {
+    out.imageCircle.textContent = `${result.imageCircleMm.toFixed(0)} mm${result.vignette ? ' · vignettes' : ''}`;
   }
 
-  elements.status.textContent = result.vignette ? 'Objective image circle does not cover the full sensor.' : '';
+  elements.status.textContent = result.vignette ? 'Objective field number does not cover the full sensor.' : '';
 
   const notes = [...result.warnings];
   if (result.type === 'camera') {
     notes.unshift('Effective aperture assumes pupil magnification = 1; internal-focus, retrofocus and reversed lenses can differ.');
-    notes.push('Working distance uses catalog MFD and barrel length plus a thin-lens principal-plane estimate. Lenses that extend while focusing can be shorter in practice.');
+    notes.push('Working distance uses catalog MFD/barrel geometry or a published free-working-distance value when available. Lenses that extend while focusing can differ.');
   } else if (objective) {
     notes.unshift(`${objective.isPlan ? 'Plan' : 'Non-plan'} objective · NA ${objective.NA}${objective.sourceRef ? ` · ${objective.sourceRef}` : ''}.`);
   }
   notes.push('DOF is geometric defocus for a two-pixel circle of confusion; diffraction is shown separately as Airy diameter.');
 
-  elements.notes.replaceChildren(...notes.map((note) => {
+  const noteNodes = notes.map((note) => {
     const p = document.createElement('p');
     p.textContent = note;
     return p;
-  }));
+  });
+  elements.notes.replaceChildren(...provenance, ...noteNodes);
 }
 
 function calculate() {
@@ -408,7 +457,7 @@ function render() {
   elements.apertureField.hidden = Boolean(objective);
 
   renderSensor(system, result);
-  renderResults(result, objective);
+  renderResults(result, objective, lens);
   renderRig(system, objective || lens, accessory, result);
   saveStateToUrl();
 }

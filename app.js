@@ -38,8 +38,10 @@ const elements = {
     effective: $('out-effective'),
     dof: $('out-dof'),
     pitch: $('out-pitch'),
+    subjectPitch: $('out-subject-pitch'),
     airy: $('out-airy'),
     airyPx: $('out-airy-px'),
+    subjectAiry: $('out-subject-airy'),
     nyquist: $('out-nyquist'),
     imageCircle: $('out-image-circle')
   }
@@ -423,8 +425,14 @@ function renderResults(result, objective, lens) {
   out.effective.textContent = `f/${result.effectiveFNumber.toFixed(1)}`;
   out.dof.textContent = formatMm(result.dofMm, result.dofMm < 1 ? 2 : 1);
   out.pitch.textContent = result.pixelPitchUm ? `${result.pixelPitchUm.toFixed(2)} µm` : '—';
+  out.subjectPitch.textContent = result.pixelPitchUm && result.magnification
+    ? `${(result.pixelPitchUm / result.magnification).toFixed(2)} µm/px`
+    : '—';
   out.airy.textContent = result.airyDiameterUm ? `${result.airyDiameterUm.toFixed(1)} µm` : '—';
   out.airyPx.textContent = result.airyPixels ? `${result.airyPixels.toFixed(1)} px` : '—';
+  out.subjectAiry.textContent = result.airyDiameterUm && result.magnification
+    ? `${(result.airyDiameterUm / result.magnification).toFixed(2)} µm`
+    : '—';
   out.nyquist.textContent = result.nyquistLpMm ? `${result.nyquistLpMm.toFixed(0)} lp/mm` : '—';
 
   elements.imageCircleResult.hidden = result.type !== 'objective' || !result.imageCircleMm;

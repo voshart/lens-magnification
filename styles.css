@@ -208,13 +208,13 @@ dd {
   border-top: 1px solid var(--rule);
   border-bottom: 1px solid var(--rule);
   padding: 6px 0;
+  overflow: hidden;
 }
 
 #rig-svg {
   display: block;
   width: 100%;
-  height: auto;
-  min-height: 80px;
+  height: 92px;
 }
 
 .rig-line { stroke: var(--ink-2); stroke-width: 1; vector-effect: non-scaling-stroke; }

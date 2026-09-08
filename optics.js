@@ -195,13 +195,13 @@ export function calculateCameraSetup({ system, lens, accessory, aperture, megapi
         : 'Working distance is unavailable or too uncertain for this lens/setup.');
   }
   if (accessory.type === 'diopter') {
-    warnings.push('Close-up-lens magnification uses a thin-lens, in-contact approximation with the camera lens at native close focus.');
+    warnings.push('Close-up-lens magnification uses a thin-lens, in-contact approximation with the camera lens at native close focus; Raynox’s 109 mm figure applies with the host lens focused at infinity.');
   }
   if (accessory.type === 'tube') {
     warnings.push('Extension-tube estimates assume nominal focal length and pupil magnification = 1 at the lens’s published native maximum magnification.');
   }
   if (accessory.type === 'reversal') {
-    warnings.push('Reversed-lens magnification comes from the stored manual estimate; working distance and pupil magnification are not modeled.');
+    warnings.push('Reversed-lens magnification is a legacy prototype estimate, not a catalog specification; working distance and pupil magnification are not modeled.');
   }
 
   return {

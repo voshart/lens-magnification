@@ -11,6 +11,9 @@ function isZoomLens(lens) {
 }
 
 function nativeWorkingDistance(system, lens) {
+  const catalogWd = positiveNumber(lens.nativeWorkingDistanceMm);
+  if (catalogWd) return catalogWd;
+
   const mfd = positiveNumber(lens.MFD);
   const lensLength = positiveNumber(lens.PL);
   const flange = positiveNumber(system.flangeDistance);
@@ -56,12 +59,16 @@ function cameraMagnification(lens, accessory) {
       return nativeMag + (positiveNumber(accessory.length) ?? 0) / f;
 
     case 'diopter': {
+      // In-contact thin-lens approximation with the camera lens left at its
+      // native close-focus extension: m_new = m_native + v * D.
       const powerPerMm = (positiveNumber(accessory.power) ?? 0) / 1000;
       const imageDistance = f * (1 + nativeMag);
       return nativeMag + imageDistance * powerPerMm;
     }
 
     case 'reversal':
+      // Reversed-lens behaviour depends strongly on real lens construction.
+      // Only use the prototype's researched/manual estimate; do not invent one.
       return parseReversalEstimate(lens.reversedMagEstimateManual, f);
 
     default:
@@ -86,6 +93,14 @@ function cameraWorkingDistance(system, lens, accessory, magnification) {
 }
 
 function sensorToSubjectDistance(system, lens, accessory, workingDistance) {
+  if (accessory.type === 'none') {
+    // Catalog MFD is measured from the focal plane and is more defensible than
+    // reconstructing the same distance from barrel geometry. For zooms only
+    // use it when the MFD at maximum reproduction is explicitly known.
+    if (isZoomLens(lens)) return positiveNumber(lens.maxMagnificationMFD);
+    return positiveNumber(lens.MFD);
+  }
+
   if (workingDistance == null) return null;
   const flange = positiveNumber(system.flangeDistance);
   const lensLength = positiveNumber(lens.PL);
@@ -229,6 +244,16 @@ export function calculateObjectiveSetup({ system, objective, megapixels }) {
   const sensorDiagonalMm = Math.hypot(system.sensorWidth, system.sensorHeight);
   const imageCircleMm = positiveNumber(objective.imageCircle_mm);
   const vignette = imageCircleMm ? imageCircleMm < sensorDiagonalMm : null;
+  const warnings = [
+    'DIN 160 mm is the mechanical objective-to-eyepiece-flange standard; this direct-to-sensor diagram places the intermediate image about 150 mm behind the objective shoulder.'
+  ];
+
+  if (!parfocalDistanceMm) {
+    warnings.push('Objective body/parfocal geometry is not published for this entry, so sensor-to-subject distance is not shown.');
+  }
+  if (!imageCircleMm) {
+    warnings.push('No defensible field-number/image-circle value is stored for this objective, so vignetting is not predicted.');
+  }
 
   return {
     type: 'objective',
@@ -245,8 +270,6 @@ export function calculateObjectiveSetup({ system, objective, megapixels }) {
     vignette,
     imageDistanceMm,
     parfocalDistanceMm,
-    warnings: [
-      'DIN 160 mm is the mechanical objective-to-eyepiece-flange standard; this direct-to-sensor diagram places the intermediate image about 150 mm behind the objective shoulder.'
-    ]
+    warnings
   };
 }

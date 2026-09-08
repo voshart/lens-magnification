@@ -2,6 +2,7 @@ import {
   LENSES_BY_SYSTEM,
   MICROSCOPE_OBJECTIVES_DATA,
   OPTIC_CATALOG,
+  ACCESSORY_CATALOG,
   MACRO_ACCESSORIES_DATA,
   REFERENCE_OBJECTS
 } from './data.js';
@@ -203,7 +204,7 @@ function drawCameraObjects(system, result) {
     <ellipse class="object-fill-strong object-outline" cx="${cx + quarterR * 0.25}" cy="${cy + quarterR * 0.25}" rx="${riceW / 2}" ry="${riceH / 2}" transform="rotate(12 ${cx + quarterR * 0.25} ${cy + quarterR * 0.25})"></ellipse>
   `;
 
-  elements.objectLegend.textContent = 'banana 180 mm · quarter 24.3 mm · rice 6 mm';
+  elements.objectLegend.textContent = 'banana ≈180 mm · US quarter 24.26 mm · rice ≈6 mm';
 }
 
 function drawObjectiveObjects(system, result) {
@@ -225,7 +226,7 @@ function drawObjectiveObjects(system, result) {
     <ellipse class="object-fill-strong object-outline" cx="${cx + system.sensorWidth * 0.23}" cy="${cy + system.sensorHeight * 0.2}" rx="${riceW / 2}" ry="${riceH / 2}" transform="rotate(12 ${cx + system.sensorWidth * 0.23} ${cy + system.sensorHeight * 0.2})"></ellipse>
   `;
 
-  elements.objectLegend.textContent = '1 mm square · tardigrade 0.4 mm · rice 6 mm';
+  elements.objectLegend.textContent = '1 mm square · tardigrade ≈0.4 mm · rice ≈6 mm';
 }
 
 function drawImageCircle(system, result) {
@@ -376,9 +377,35 @@ function catalogNodes(lens, objective) {
   return nodes;
 }
 
+function accessoryCatalogNodes(accessory) {
+  const entry = ACCESSORY_CATALOG[elements.accessory.value];
+  if (!entry || accessory.type === 'none') return [];
+
+  const p = document.createElement('p');
+  if (entry.url) {
+    p.append('Accessory: ');
+    const a = document.createElement('a');
+    a.href = entry.url;
+    a.textContent = entry.label;
+    a.rel = 'external';
+    p.append(a);
+  } else {
+    p.textContent = `Accessory: ${entry.label}`;
+  }
+
+  const nodes = [p];
+  if (entry.note) {
+    const note = document.createElement('p');
+    note.textContent = entry.note;
+    nodes.push(note);
+  }
+  return nodes;
+}
+
 function renderResults(result, objective, lens) {
   const out = elements.out;
-  const provenance = catalogNodes(lens, objective);
+  const accessory = MACRO_ACCESSORIES_DATA[elements.accessory.value] ?? MACRO_ACCESSORIES_DATA.none;
+  const provenance = [...catalogNodes(lens, objective), ...(!objective ? accessoryCatalogNodes(accessory) : [])];
 
   if (!result.valid) {
     elements.imageCircleResult.hidden = true;

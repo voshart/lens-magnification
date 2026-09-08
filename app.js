@@ -484,11 +484,13 @@ function render() {
   const system = currentSystem();
   const objective = currentObjective();
   const lens = currentLens();
+  const lockAccessory = !objective && lens?.accessoryModel === false;
+  if (lockAccessory && elements.accessory.value !== 'none') elements.accessory.value = 'none';
   const accessory = MACRO_ACCESSORIES_DATA[elements.accessory.value] ?? MACRO_ACCESSORIES_DATA.none;
   const result = calculate();
   if (!system || !result) return;
 
-  elements.accessoryField.hidden = Boolean(objective);
+  elements.accessoryField.hidden = Boolean(objective) || lockAccessory;
   elements.apertureField.hidden = Boolean(objective);
 
   renderSensor(system, result);

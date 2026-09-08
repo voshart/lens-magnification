@@ -70,6 +70,7 @@ function cameraMagnification(lens, accessory) {
 
 function cameraWorkingDistance(system, lens, accessory, magnification) {
   if (!magnification || magnification <= 0 || accessory.type === 'reversal') return null;
+  if (/\d+(?:\.\d+)?[-–]\d+(?:\.\d+)?mm/i.test(lens.name)) return null;
 
   const f = positiveNumber(lens.f);
   const nativeMag = positiveNumber(lens.NM);
@@ -169,8 +170,14 @@ export function calculateCameraSetup({ system, lens, accessory, aperture, megapi
   const dofMm = geometricDofMm(magnification, effectiveFNumber, pitchUm);
   const warnings = [];
 
+  const isZoom = /\d+(?:\.\d+)?[-–]\d+(?:\.\d+)?mm/i.test(lens.name);
   if (workingDistanceMm == null) {
-    warnings.push('Working distance is unavailable or too uncertain for this lens/setup.');
+    warnings.push(isZoom
+      ? 'Working distance is not modeled for zoom lenses because focal length, physical length and published maximum magnification can refer to different zoom positions.'
+      : 'Working distance is unavailable or too uncertain for this lens/setup.');
+  }
+  if (isZoom && accessory.type !== 'none') {
+    warnings.push('Accessory magnification on zoom lenses is approximate and uses the stored focal-length endpoint.');
   }
   if (accessory.type === 'diopter') {
     warnings.push('Close-up-lens magnification and working distance use a thin-lens approximation with the camera lens at native close focus.');

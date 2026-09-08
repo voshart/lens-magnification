@@ -1,8 +1,13 @@
 const GREEN_WAVELENGTH_UM = 0.55;
+const DIN_160_IMAGE_DISTANCE_MM = 150;
 
 function positiveNumber(value) {
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? number : null;
+}
+
+function isZoomLens(lens) {
+  return /\d+(?:\.\d+)?[-–]\d+(?:\.\d+)?mm/i.test(lens.name);
 }
 
 function nativeWorkingDistance(system, lens) {
@@ -51,16 +56,12 @@ function cameraMagnification(lens, accessory) {
       return nativeMag + (positiveNumber(accessory.length) ?? 0) / f;
 
     case 'diopter': {
-      // Thin-lens model with the camera lens left at its native close-focus setting.
-      // v = f(1+m0); adding close-up power D gives m = m0 + vD.
       const powerPerMm = (positiveNumber(accessory.power) ?? 0) / 1000;
       const imageDistance = f * (1 + nativeMag);
       return nativeMag + imageDistance * powerPerMm;
     }
 
     case 'reversal':
-      // Reversal geometry depends strongly on lens construction and pupil placement.
-      // Use only a researched/manual estimate rather than a misleading thin-lens fallback.
       return parseReversalEstimate(lens.reversedMagEstimateManual, f);
 
     default:
@@ -69,8 +70,8 @@ function cameraMagnification(lens, accessory) {
 }
 
 function cameraWorkingDistance(system, lens, accessory, magnification) {
-  if (!magnification || magnification <= 0 || accessory.type === 'reversal') return null;
-  if (/\d+(?:\.\d+)?[-–]\d+(?:\.\d+)?mm/i.test(lens.name)) return null;
+  if (!magnification || magnification <= 0) return null;
+  if (accessory.type === 'reversal' || accessory.type === 'diopter' || isZoomLens(lens)) return null;
 
   const f = positiveNumber(lens.f);
   const nativeMag = positiveNumber(lens.NM);
@@ -79,14 +80,7 @@ function cameraWorkingDistance(system, lens, accessory, magnification) {
 
   if (accessory.type === 'none') return nativeWorkingDistance(system, lens);
 
-  let objectDistance;
-  if (accessory.type === 'diopter') {
-    const imageDistance = f * (1 + nativeMag);
-    objectDistance = imageDistance / magnification;
-  } else {
-    objectDistance = f * (1 + 1 / magnification);
-  }
-
+  const objectDistance = f * (1 + 1 / magnification);
   const wd = objectDistance - principalOffset;
   return wd > 0 ? wd : null;
 }
@@ -139,7 +133,6 @@ function samplingDetails(effectiveFNumber, pitchUm) {
 function geometricDofMm(magnification, effectiveFNumber, pitchUm) {
   if (!magnification || !effectiveFNumber || !pitchUm) return null;
 
-  // Approximate macro DOF with a two-pixel circle of confusion.
   const cocMm = (pitchUm * 2) / 1000;
   return 2 * effectiveFNumber * cocMm / (magnification * magnification);
 }
@@ -148,6 +141,15 @@ export function calculateCameraSetup({ system, lens, accessory, aperture, megapi
   const markedAperture = positiveNumber(aperture);
   if (!markedAperture) {
     return { type: 'camera', valid: false, reason: 'Enter a valid aperture.' };
+  }
+
+  const zoom = isZoomLens(lens);
+  if (zoom && (accessory.type === 'tube' || accessory.type === 'diopter')) {
+    return {
+      type: 'camera',
+      valid: false,
+      reason: 'Extension-tube and close-up-lens estimates are not modeled for zoom lenses because maximum magnification and focal length often occur at different zoom positions.'
+    };
   }
 
   const magnification = cameraMagnification(lens, accessory);
@@ -170,23 +172,21 @@ export function calculateCameraSetup({ system, lens, accessory, aperture, megapi
   const dofMm = geometricDofMm(magnification, effectiveFNumber, pitchUm);
   const warnings = [];
 
-  const isZoom = /\d+(?:\.\d+)?[-–]\d+(?:\.\d+)?mm/i.test(lens.name);
   if (workingDistanceMm == null) {
-    warnings.push(isZoom
-      ? 'Working distance is not modeled for zoom lenses because focal length, physical length and published maximum magnification can refer to different zoom positions.'
-      : 'Working distance is unavailable or too uncertain for this lens/setup.');
-  }
-  if (isZoom && accessory.type !== 'none') {
-    warnings.push('Accessory magnification on zoom lenses is approximate and uses the stored focal-length endpoint.');
+    warnings.push(zoom
+      ? 'Working distance is not modeled for zoom lenses because published dimensions and maximum magnification can refer to different zoom positions.'
+      : accessory.type === 'diopter'
+        ? 'Working distance is not shown for the close-up lens because the attachment shifts the combined system principal planes.'
+        : 'Working distance is unavailable or too uncertain for this lens/setup.');
   }
   if (accessory.type === 'diopter') {
-    warnings.push('Close-up-lens magnification and working distance use a thin-lens approximation with the camera lens at native close focus.');
+    warnings.push('Close-up-lens magnification uses a thin-lens, in-contact approximation with the camera lens at native close focus.');
   }
   if (accessory.type === 'tube') {
-    warnings.push('Extension-tube estimates assume the lens behaves like a thin lens at its published native maximum magnification.');
+    warnings.push('Extension-tube estimates assume nominal focal length and pupil magnification = 1 at the lens’s published native maximum magnification.');
   }
   if (accessory.type === 'reversal') {
-    warnings.push('Reversed-lens magnification comes from the stored manual estimate; working distance is not modeled.');
+    warnings.push('Reversed-lens magnification comes from the stored manual estimate; working distance and pupil magnification are not modeled.');
   }
 
   return {
@@ -215,8 +215,14 @@ export function calculateObjectiveSetup({ system, objective, megapixels }) {
   const effectiveFNumber = magnification / (2 * na);
   const fov = fieldOfView(system, magnification);
   const workingDistanceMm = positiveNumber(objective.WD_obj_mm);
-  const sensorToSubjectMm = positiveNumber(objective.standardFiniteTubeLength) && workingDistanceMm
-    ? objective.standardFiniteTubeLength + workingDistanceMm
+  const objectiveBodyMm = positiveNumber(objective.PL_obj_body_mm);
+  const mechanicalTubeLengthMm = positiveNumber(objective.standardFiniteTubeLength) ?? 160;
+  const imageDistanceMm = mechanicalTubeLengthMm === 160 ? DIN_160_IMAGE_DISTANCE_MM : null;
+  const parfocalDistanceMm = objectiveBodyMm && workingDistanceMm
+    ? objectiveBodyMm + workingDistanceMm
+    : null;
+  const sensorToSubjectMm = imageDistanceMm && parfocalDistanceMm
+    ? imageDistanceMm + parfocalDistanceMm
     : null;
   const sampling = samplingDetails(effectiveFNumber, pitchUm);
   const dofMm = geometricDofMm(magnification, effectiveFNumber, pitchUm);
@@ -237,8 +243,10 @@ export function calculateObjectiveSetup({ system, objective, megapixels }) {
     ...sampling,
     imageCircleMm,
     vignette,
+    imageDistanceMm,
+    parfocalDistanceMm,
     warnings: [
-      `Assumes the objective is used at its nominal ${objective.standardFiniteTubeLength || 160} mm finite tube length.`
+      'DIN 160 mm is the mechanical objective-to-eyepiece-flange standard; this direct-to-sensor diagram places the intermediate image about 150 mm behind the objective shoulder.'
     ]
   };
 }

@@ -322,6 +322,7 @@ function renderResults(result, objective) {
   const out = elements.out;
 
   if (!result.valid) {
+    elements.imageCircleResult.hidden = true;
     for (const node of Object.values(out)) node.textContent = '—';
     elements.status.textContent = result.reason;
     elements.notes.textContent = '';

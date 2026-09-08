@@ -51,6 +51,8 @@ const defaultState = {
   megapixels: 45
 };
 
+let megapixelsUserSet = false;
+
 function option(value, label) {
   const el = document.createElement('option');
   el.value = value;
@@ -73,7 +75,6 @@ function currentLens() {
 function populateSystems() {
   const entries = Object.entries(LENSES_BY_SYSTEM)
     .sort(([, a], [, b]) => a.systemName.localeCompare(b.systemName));
-
   elements.system.replaceChildren(...entries.map(([id, data]) => option(id, data.systemName)));
 }
 
@@ -87,6 +88,7 @@ function populateLenses(preferredId) {
   macroGroup.label = 'Macro / close-focus lenses';
   const otherGroup = document.createElement('optgroup');
   otherGroup.label = 'Other lenses';
+
   for (const [id, lens] of lensEntries) {
     (Number(lens.NM) >= 0.5 ? macroGroup : otherGroup).append(option(id, lens.name));
   }
@@ -126,7 +128,10 @@ function loadStateFromUrl() {
 
   if (accessory && MACRO_ACCESSORIES_DATA[accessory]) elements.accessory.value = accessory;
   if (Number.isFinite(aperture) && aperture > 0) elements.aperture.value = aperture;
-  if (Number.isFinite(megapixels) && megapixels > 0) elements.megapixels.value = megapixels;
+  if (Number.isFinite(megapixels) && megapixels > 0) {
+    elements.megapixels.value = megapixels;
+    megapixelsUserSet = true;
+  }
 }
 
 function saveStateToUrl() {
@@ -139,10 +144,11 @@ function saveStateToUrl() {
     const aperture = Number(elements.aperture.value);
     if (Number.isFinite(aperture) && aperture > 0) params.set('f', aperture.toString());
   }
+
   const megapixels = Number(elements.megapixels.value);
   if (Number.isFinite(megapixels) && megapixels > 0) params.set('mp', megapixels.toString());
 
-  history.replaceState(null, '', `${location.pathname}?${params}`);
+  history.replaceState(null, '', `${location.pathname}?${params}${location.hash}`);
 }
 
 function formatMm(value, digits = 1) {
@@ -163,8 +169,7 @@ function formatMag(value) {
 }
 
 function setSvgDimensions(width, height) {
-  const box = `0 0 ${width} ${height}`;
-  elements.sensorSvg.setAttribute('viewBox', box);
+  elements.sensorSvg.setAttribute('viewBox', `0 0 ${width} ${height}`);
   for (const rect of [elements.sensorBg, elements.sensorBorder, elements.sensorClipRect]) {
     rect.setAttribute('width', width);
     rect.setAttribute('height', height);
@@ -181,7 +186,6 @@ function drawCameraObjects(system, result) {
   const bananaH = banana.widthMm * m;
   const bananaX = cx - bananaW / 2;
   const bananaY = cy - bananaH / 2;
-
   const quarterR = quarter.diameterMm * m / 2;
   const riceW = rice.widthMm * m;
   const riceH = rice.lengthMm * m;
@@ -256,10 +260,13 @@ function svgEscape(text) {
   return String(text).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[char]));
 }
 
-function rigSegmentScale(values, usableWidth) {
-  const finite = values.filter((value) => Number.isFinite(value) && value > 0);
-  const total = finite.reduce((sum, value) => sum + value, 0);
-  return total > 0 ? usableWidth / total : 1;
+function segmentWidths(blocks, usableWidth) {
+  const bases = blocks.map((item) => item.type === 'block' ? 34 : 10);
+  const baseTotal = bases.reduce((sum, value) => sum + value, 0);
+  const valueTotal = blocks.reduce((sum, item) => sum + Math.max(0, Number(item.value) || 0), 0);
+  const extra = Math.max(0, usableWidth - baseTotal);
+
+  return blocks.map((item, index) => bases[index] + (valueTotal ? extra * item.value / valueTotal : 0));
 }
 
 function renderRig(system, lensOrObjective, accessory, result) {
@@ -268,19 +275,19 @@ function renderRig(system, lensOrObjective, accessory, result) {
     return;
   }
 
-  const left = 30;
-  const right = 970;
+  const width = Math.max(300, Math.round(elements.rigSvg.clientWidth || 1000));
+  elements.rigSvg.setAttribute('viewBox', `0 0 ${width} 92`);
+  const left = 12;
+  const right = width - 12;
   const y = 47;
   let blocks;
 
   if (result.type === 'objective') {
-    const wd = result.workingDistanceMm ?? 0;
     const body = lensOrObjective.PL_obj_body_mm ?? 40;
-    const tube = Math.max(0, (lensOrObjective.standardFiniteTubeLength ?? 160) - body);
     blocks = [
-      { label: `WD ${formatMm(result.workingDistanceMm, 1)}`, value: wd, type: 'space' },
-      { label: `${lensOrObjective.M_obj}× objective`, value: body, type: 'block' },
-      { label: `${tube.toFixed(0)} mm tube`, value: tube, type: 'block' }
+      { label: `WD ${formatMm(result.workingDistanceMm, 1)}`, value: result.workingDistanceMm ?? 0, type: 'space' },
+      { label: `${lensOrObjective.M_obj}×`, value: body, type: 'block' },
+      { label: `${result.imageDistanceMm ?? 150} mm image distance`, value: result.imageDistanceMm ?? 150, type: 'space' }
     ];
   } else {
     const wd = result.workingDistanceMm;
@@ -290,19 +297,21 @@ function renderRig(system, lensOrObjective, accessory, result) {
     blocks = [
       { label: wd == null ? 'WD unknown' : `WD ${formatMm(wd, 0)}`, value: wd ?? Math.max(lensLength * 0.8, 30), type: 'space', uncertain: wd == null },
       { label: 'lens', value: lensLength, type: 'block' },
-      ...(extension > 0 ? [{ label: `${extension} mm tube`, value: extension, type: 'block' }] : []),
-      { label: `${flange} mm flange`, value: flange, type: 'block' }
+      ...(extension > 0 ? [{ label: `${extension} mm`, value: extension, type: 'block' }] : []),
+      { label: `${flange} mm`, value: flange, type: 'block' }
     ];
   }
 
-  const scale = rigSegmentScale(blocks.map((item) => item.value), right - left);
+  const widths = segmentWidths(blocks, right - left);
   let x = left;
-  const pieces = [`<line class="rig-line" x1="${left}" y1="${y}" x2="${right}" y2="${y}"></line>`,
+  const pieces = [
+    `<line class="rig-line" x1="${left}" y1="${y}" x2="${right}" y2="${y}"></line>`,
     `<line class="rig-line" x1="${left}" y1="20" x2="${left}" y2="74"></line>`,
-    `<text class="rig-text-muted" x="${left}" y="15">subject</text>`];
+    `<text class="rig-text-muted" x="${left}" y="15">subject</text>`
+  ];
 
-  for (const item of blocks) {
-    const width = Math.max(item.type === 'block' ? 24 : 24, item.value * scale);
+  blocks.forEach((item, index) => {
+    const width = widths[index];
     if (item.type === 'space') {
       pieces.push(`<line class="rig-line ${item.uncertain ? 'rig-dashed' : ''}" x1="${x}" y1="${y}" x2="${x + width}" y2="${y}"></line>`);
       pieces.push(`<text class="rig-text-muted" text-anchor="middle" x="${x + width / 2}" y="${y - 9}">${svgEscape(item.label)}</text>`);
@@ -311,10 +320,10 @@ function renderRig(system, lensOrObjective, accessory, result) {
       pieces.push(`<text class="rig-text" text-anchor="middle" x="${x + width / 2}" y="${y + 4}">${svgEscape(item.label)}</text>`);
     }
     x += width;
-  }
+  });
 
-  pieces.push(`<line class="rig-line" x1="${x}" y1="20" x2="${x}" y2="74"></line>`);
-  pieces.push(`<text class="rig-text-muted" text-anchor="end" x="${x}" y="87">sensor</text>`);
+  pieces.push(`<line class="rig-line" x1="${right}" y1="20" x2="${right}" y2="74"></line>`);
+  pieces.push(`<text class="rig-text-muted" text-anchor="end" x="${right}" y="87">sensor</text>`);
   elements.rigSvg.innerHTML = pieces.join('');
 }
 
@@ -325,13 +334,14 @@ function renderResults(result, objective) {
     elements.imageCircleResult.hidden = true;
     for (const node of Object.values(out)) node.textContent = '—';
     elements.status.textContent = result.reason;
-    elements.notes.textContent = '';
+    elements.notes.replaceChildren();
     return;
   }
 
   out.mag.textContent = formatMag(result.magnification);
   out.fov.textContent = formatFov(result.fov);
-  out.wd.textContent = formatMm(result.workingDistanceMm, result.workingDistanceMm < 10 ? 2 : 0);
+  const wdDigits = Number.isFinite(result.workingDistanceMm) && result.workingDistanceMm < 10 ? 2 : 0;
+  out.wd.textContent = formatMm(result.workingDistanceMm, wdDigits);
   out.total.textContent = formatMm(result.sensorToSubjectMm, 0);
   out.effective.textContent = `f/${result.effectiveFNumber.toFixed(1)}`;
   out.dof.textContent = formatMm(result.dofMm, result.dofMm < 1 ? 2 : 1);
@@ -351,14 +361,18 @@ function renderResults(result, objective) {
 
   const notes = [...result.warnings];
   if (result.type === 'camera') {
-    notes.unshift('Effective aperture assumes pupil magnification = 1; internal-focus macro lenses can differ.');
-    notes.push('Working distance is reconstructed from published MFD, lens length and a thin-lens model when enough geometry is available.');
+    notes.unshift('Effective aperture assumes pupil magnification = 1; internal-focus, retrofocus and reversed lenses can differ.');
+    notes.push('Working distance uses catalog MFD and barrel length plus a thin-lens principal-plane estimate. Lenses that extend while focusing can be shorter in practice.');
   } else if (objective) {
     notes.unshift(`${objective.isPlan ? 'Plan' : 'Non-plan'} objective · NA ${objective.NA}${objective.sourceRef ? ` · ${objective.sourceRef}` : ''}.`);
   }
-  notes.push('DOF uses a two-pixel circle of confusion and is a geometric estimate; diffraction is shown separately as Airy diameter.');
+  notes.push('DOF is geometric defocus for a two-pixel circle of confusion; diffraction is shown separately as Airy diameter.');
 
-  elements.notes.innerHTML = notes.map((note) => `<p>${note}</p>`).join('');
+  elements.notes.replaceChildren(...notes.map((note) => {
+    const p = document.createElement('p');
+    p.textContent = note;
+    return p;
+  }));
 }
 
 function calculate() {
@@ -367,10 +381,7 @@ function calculate() {
   const megapixels = Number(elements.megapixels.value);
 
   if (!system) return null;
-
-  if (objective) {
-    return calculateObjectiveSetup({ system, objective, megapixels });
-  }
+  if (objective) return calculateObjectiveSetup({ system, objective, megapixels });
 
   const lens = currentLens();
   const accessory = MACRO_ACCESSORIES_DATA[elements.accessory.value] ?? MACRO_ACCESSORIES_DATA.none;
@@ -406,7 +417,7 @@ function handleSystemChange() {
   const previousLens = elements.lens.value;
   populateLenses(previousLens);
   const system = currentSystem();
-  if (system?.typicalMegapixels) elements.megapixels.value = system.typicalMegapixels;
+  if (!megapixelsUserSet && system?.typicalMegapixels) elements.megapixels.value = system.typicalMegapixels;
   render();
 }
 
@@ -418,10 +429,14 @@ elements.aperture.value = defaultState.aperture;
 elements.megapixels.value = defaultState.megapixels;
 loadStateFromUrl();
 
-for (const control of [elements.lens, elements.accessory, elements.aperture, elements.megapixels]) {
-  control.addEventListener('input', render);
-  control.addEventListener('change', render);
-}
+elements.lens.addEventListener('change', render);
+elements.accessory.addEventListener('change', render);
+elements.aperture.addEventListener('input', render);
+elements.megapixels.addEventListener('input', () => {
+  megapixelsUserSet = true;
+  render();
+});
 elements.system.addEventListener('change', handleSystemChange);
+window.addEventListener('resize', render);
 
 render();

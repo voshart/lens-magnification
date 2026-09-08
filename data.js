@@ -19,7 +19,7 @@ export const LENSES_BY_SYSTEM = {
         "name": "Sigma 70mm f/2.8 DG Macro Art (Sony E)",
         "f": 70,
         "NM": 1,
-        "PL": 105.8,
+        "PL": 131.8,
         "MFD": 258,
         "reversedMagEstimateManual": "~0.8:1"
       },
@@ -27,7 +27,7 @@ export const LENSES_BY_SYSTEM = {
         "name": "Sigma 105mm F2.8 DG DN Macro Art (Sony E)",
         "f": 105,
         "NM": 1,
-        "PL": 133.6,
+        "PL": 135.6,
         "MFD": 295,
         "reversedMagEstimateManual": "~0.5:1"
       },
@@ -281,14 +281,6 @@ export const LENSES_BY_SYSTEM = {
         "PL": 32,
         "MFD": 200,
         "reversedMagEstimateManual": "~3.8:1 (at 16mm)"
-      },
-      "nikon_z_dx_24mm_f1_7_ext_poc": {
-        "name": "Nikon NIKKOR Z DX 24mm f/1.7",
-        "f": 24,
-        "NM": 0.19,
-        "PL": 40,
-        "MFD": 180,
-        "reversedMagEstimateManual": "~2.8:1"
       }
     }
   },
@@ -367,9 +359,9 @@ export const LENSES_BY_SYSTEM = {
       "canon_rfs_18_150mm_f3_5_6_3_is_stm": {
         "name": "Canon RF-S 18-150mm f/3.5-6.3 IS STM",
         "f": 18,
-        "NM": 0.59,
-        "PL": 127,
-        "MFD": 120,
+        "NM": 0.44,
+        "PL": 84.5,
+        "MFD": 170,
         "reversedMagEstimateManual": "~3.5:1 (at 18mm), <1:1 (at 150mm)"
       },
       "sigma_18_50mm_f2_8_dc_dn_c_rfs": {
@@ -403,14 +395,6 @@ export const LENSES_BY_SYSTEM = {
         "PL": 92.9,
         "MFD": 730,
         "reversedMagEstimateManual": "~1.0:1 (at 55mm), <1:1 (at 210mm)"
-      },
-      "canon_rfs_10_18mm_f4_5_6_3_is_stm_ext_poc": {
-        "name": "Canon RF-S 10-18mm f/4.5-6.3 IS STM",
-        "f": 10,
-        "NM": 0.5,
-        "PL": 44.9,
-        "MFD": 86,
-        "reversedMagEstimateManual": "~5:1 or more (at 10mm)"
       },
       "canon_rfs_18_45mm_f4_5_6_3_is_stm_ext_poc": {
         "name": "Canon RF-S 18-45mm f/4.5-6.3 IS STM",
@@ -572,7 +556,7 @@ export const MICROSCOPE_OBJECTIVES_DATA = {
     "PL_obj_body_mm": 44.5,
     "imageCircle_mm": 20,
     "isPlan": false,
-    "sourceRef": "Edmund Optics (#36-038)"
+    "sourceRef": "Edmund Optics (#33-439)"
   },
   "mo_10x_025_160_plan": {
     "name": "10x NA 0.25 Plan Achromat (DIN 160mm)",

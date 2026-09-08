@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A compact macro and microscope-objective magnification calculator.">
+  <title>Lens Magnification</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="masthead">
+      <div>
+        <h1>Lens Magnification</h1>
+        <p>Macro lenses, extension tubes, close-up lenses, reversed lenses and finite microscope objectives.</p>
+      </div>
+      <a href="https://github.com/voshart/lens-magnification">source</a>
+    </header>
+
+    <form class="controls" id="controls">
+      <label class="field field-system">
+        <span>Camera / sensor</span>
+        <select id="system" name="system"></select>
+      </label>
+
+      <label class="field field-lens">
+        <span>Lens / objective</span>
+        <select id="lens" name="lens"></select>
+      </label>
+
+      <label class="field field-accessory" id="accessory-field">
+        <span>Accessory</span>
+        <select id="accessory" name="accessory"></select>
+      </label>
+
+      <label class="field field-small" id="aperture-field">
+        <span>Aperture</span>
+        <input id="aperture" name="aperture" type="number" value="8" min="0.7" max="64" step="0.1" inputmode="decimal">
+      </label>
+
+      <label class="field field-small">
+        <span>Sensor MP</span>
+        <input id="megapixels" name="megapixels" type="number" value="45" min="1" max="200" step="0.1" inputmode="decimal">
+      </label>
+    </form>
+
+    <section class="workspace" aria-live="polite">
+      <figure class="sensor-panel">
+        <div class="sensor-frame" id="sensor-frame">
+          <svg id="sensor-svg" viewBox="0 0 36 24" role="img" aria-labelledby="sensor-title sensor-desc">
+            <title id="sensor-title">Sensor reproduction preview</title>
+            <desc id="sensor-desc">Reference objects projected onto the selected sensor at the calculated magnification.</desc>
+            <defs>
+              <clipPath id="sensor-clip">
+                <rect id="sensor-clip-rect" x="0" y="0" width="36" height="24"></rect>
+              </clipPath>
+            </defs>
+            <rect id="sensor-bg" x="0" y="0" width="36" height="24" class="sensor-bg"></rect>
+            <g id="image-circle-layer" clip-path="url(#sensor-clip)"></g>
+            <g id="object-layer" clip-path="url(#sensor-clip)"></g>
+            <rect id="sensor-border" x="0" y="0" width="36" height="24" class="sensor-border"></rect>
+          </svg>
+        </div>
+        <figcaption>
+          <span id="sensor-caption">Select a lens.</span>
+          <span id="object-legend"></span>
+        </figcaption>
+      </figure>
+
+      <aside class="readout">
+        <dl class="primary-results">
+          <div>
+            <dt>Magnification</dt>
+            <dd id="out-mag">—</dd>
+          </div>
+          <div>
+            <dt>Field of view</dt>
+            <dd id="out-fov">—</dd>
+          </div>
+          <div>
+            <dt>Working distance</dt>
+            <dd id="out-wd">—</dd>
+          </div>
+          <div>
+            <dt>Sensor → subject</dt>
+            <dd id="out-total">—</dd>
+          </div>
+          <div>
+            <dt>Effective aperture</dt>
+            <dd id="out-effective">—</dd>
+          </div>
+          <div>
+            <dt>DOF <small>(2 px CoC)</small></dt>
+            <dd id="out-dof">—</dd>
+          </div>
+        </dl>
+        <p class="status" id="status"></p>
+      </aside>
+    </section>
+
+    <figure class="rig-panel">
+      <svg id="rig-svg" viewBox="0 0 1000 92" role="img" aria-label="Approximate physical section of subject, lens, accessory and sensor"></svg>
+    </figure>
+
+    <details class="details" id="details">
+      <summary>Optical details & assumptions</summary>
+      <div class="details-grid">
+        <dl class="secondary-results">
+          <div><dt>Pixel pitch</dt><dd id="out-pitch">—</dd></div>
+          <div><dt>Airy diameter <small>(550 nm)</small></dt><dd id="out-airy">—</dd></div>
+          <div><dt>Airy diameter</dt><dd id="out-airy-px">—</dd></div>
+          <div><dt>Sensor Nyquist</dt><dd id="out-nyquist">—</dd></div>
+          <div id="image-circle-result" hidden><dt>Objective image circle</dt><dd id="out-image-circle">—</dd></div>
+        </dl>
+        <div class="notes" id="notes"></div>
+      </div>
+    </details>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

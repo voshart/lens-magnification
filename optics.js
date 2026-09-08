@@ -158,6 +158,14 @@ export function calculateCameraSetup({ system, lens, accessory, aperture, megapi
     return { type: 'camera', valid: false, reason: 'Enter a valid aperture.' };
   }
 
+  if (lens.accessoryModel === false && accessory.type !== 'none') {
+    return {
+      type: 'camera',
+      valid: false,
+      reason: 'Accessory stacking is not modeled for this dedicated high-magnification lens preset.'
+    };
+  }
+
   const zoom = isZoomLens(lens);
   if (zoom && (accessory.type === 'tube' || accessory.type === 'diopter')) {
     return {

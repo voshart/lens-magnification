@@ -56,11 +56,23 @@
               </clipPath>
             </defs>
             <rect id="sensor-bg" x="0" y="0" width="36" height="24" class="sensor-bg"></rect>
-            <g id="image-circle-layer" clip-path="url(#sensor-clip)"></g>
             <g id="object-layer" clip-path="url(#sensor-clip)"></g>
+            <g id="image-circle-layer" clip-path="url(#sensor-clip)"></g>
             <rect id="sensor-border" x="0" y="0" width="36" height="24" class="sensor-border"></rect>
           </svg>
         </div>
+        <section class="magnification-picker" aria-labelledby="magnification-picker-label">
+          <div class="magnification-picker-heading">
+            <label id="magnification-picker-label" for="magnification-slider">Target magnification</label>
+            <output id="magnification-target" for="magnification-slider">—</output>
+          </div>
+          <input class="magnification-slider" id="magnification-slider" type="range" min="-1" max="1.602" step="0.001" value="0">
+          <div class="magnification-scale" aria-hidden="true">
+            <span id="magnification-min">—</span>
+            <span id="magnification-max">—</span>
+          </div>
+          <p class="magnification-match" id="magnification-match" aria-live="polite"></p>
+        </section>
         <figcaption>
           <span id="sensor-caption">Select a lens.</span>
           <span id="object-legend"></span>
@@ -99,6 +111,7 @@
         <div class="notes" id="notes"></div>
       </div>
     </details>
+
   </main>
 
   <script type="module" src="app.js"></script>

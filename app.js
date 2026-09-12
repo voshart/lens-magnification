@@ -537,10 +537,16 @@ function renderResults(result, objective, lens) {
 
   elements.imageCircleResult.hidden = result.type !== 'objective' || !result.imageCircleMm;
   if (result.type === 'objective' && result.imageCircleMm) {
-    out.imageCircle.textContent = `${result.imageCircleMm.toFixed(0)} mm${result.vignette ? ' · vignettes' : ''}`;
+    const estimate = result.imageCircleEstimated ? '≈' : '';
+    const uncertainty = result.imageCircleEstimated ? ' · estimated' : '';
+    out.imageCircle.textContent = `${estimate}${result.imageCircleMm.toFixed(0)} mm${uncertainty}${result.vignette ? ' · vignettes' : ''}`;
   }
 
-  elements.status.textContent = result.vignette ? 'Objective field number does not cover the full sensor.' : '';
+  elements.status.textContent = result.vignette
+    ? result.imageCircleEstimated
+      ? 'Estimated objective field may not cover the full sensor.'
+      : 'Objective field number does not cover the full sensor.'
+    : '';
 
   const notes = [...result.warnings];
   if (result.type === 'camera') {

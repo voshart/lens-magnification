@@ -286,6 +286,7 @@ export function calculateObjectiveSetup({ system, objective, megapixels }) {
   const dofMm = geometricDofMm(magnification, effectiveFNumber, pitchUm);
   const sensorDiagonalMm = Math.hypot(system.sensorWidth, system.sensorHeight);
   const imageCircleMm = positiveNumber(objective.imageCircle_mm);
+  const imageCircleEstimated = Boolean(imageCircleMm && objective.imageCircleEstimated);
   const vignette = imageCircleMm ? imageCircleMm < sensorDiagonalMm : null;
   const warnings = [
     'DIN 160 mm is the mechanical objective-to-eyepiece-flange standard; this direct-to-sensor diagram places the intermediate image about 150 mm behind the objective shoulder.'
@@ -294,7 +295,9 @@ export function calculateObjectiveSetup({ system, objective, megapixels }) {
   if (!parfocalDistanceMm) {
     warnings.push('Objective body/parfocal geometry is not published for this entry, so sensor-to-subject distance is not shown.');
   }
-  if (!imageCircleMm) {
+  if (imageCircleEstimated) {
+    warnings.push('The 18 mm field-number/image-circle value is a conservative typical DIN estimate, not a manufacturer specification. The vignette is illustrative and the actual illuminated field may differ.');
+  } else if (!imageCircleMm) {
     warnings.push('No defensible field-number/image-circle value is stored for this objective, so vignetting is not predicted.');
   }
 
@@ -310,6 +313,7 @@ export function calculateObjectiveSetup({ system, objective, megapixels }) {
     pixelPitchUm: pitchUm,
     ...sampling,
     imageCircleMm,
+    imageCircleEstimated,
     vignette,
     imageDistanceMm,
     parfocalDistanceMm,

@@ -196,8 +196,8 @@ function setSvgDimensions(width, height) {
 
 function referenceObjectAnchor(system) {
   return {
-    x: system.sensorWidth * 0.53,
-    y: system.sensorHeight * 0.55
+    x: system.sensorWidth / 2,
+    y: system.sensorHeight / 2
   };
 }
 

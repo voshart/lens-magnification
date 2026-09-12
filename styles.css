@@ -94,6 +94,27 @@ h1 {
   line-height: 1;
 }
 
+.field.is-unavailable {
+  position: relative;
+}
+
+.field.is-unavailable::after {
+  content: attr(data-unavailable);
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  left: 1px;
+  display: flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 9px;
+  border-radius: 1px;
+  color: var(--ink-2);
+  background: var(--paper);
+  font-size: 0.8rem;
+  pointer-events: none;
+}
+
 select,
 input {
   width: 100%;
@@ -308,10 +329,30 @@ dd {
 }
 
 .magnification-match {
-  min-height: 1.15em;
-  margin: 7px 0 0;
+  display: grid;
+  gap: 5px;
+  min-height: 52px;
+  margin-top: 9px;
+}
+
+.magnification-match > span {
+  overflow: hidden;
   color: var(--ink-2);
   font-size: 0.76rem;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.magnification-match select {
+  height: 32px;
+  font-size: 0.76rem;
+}
+
+.magnification-match select:disabled {
+  color: var(--ink);
+  cursor: default;
+  opacity: 1;
 }
 
 @media (max-width: 840px) {

@@ -9,7 +9,8 @@ import {
 import {
   calculateCameraSetup,
   calculateObjectiveSetup,
-  closestMagnificationCandidate
+  closestMagnificationCandidate,
+  closestMagnificationCandidates
 } from './optics.js';
 
 const $ = (id) => document.getElementById(id);
@@ -39,6 +40,7 @@ const elements = {
   magnificationMin: $('magnification-min'),
   magnificationMax: $('magnification-max'),
   magnificationMatch: $('magnification-match'),
+  equivalentLens: $('equivalent-lens'),
   out: {
     mag: $('out-mag'),
     fov: $('out-fov'),
@@ -66,6 +68,7 @@ const defaultState = {
 
 let megapixelsUserSet = false;
 let requestedMagnification = null;
+let equivalentPreference = null;
 
 function option(value, label) {
   const el = document.createElement('option');
@@ -131,6 +134,23 @@ function populateAccessories() {
   const entries = Object.entries(MACRO_ACCESSORIES_DATA)
     .sort(([, a], [, b]) => (order[a.type] ?? 9) - (order[b.type] ?? 9) || (a.length ?? 0) - (b.length ?? 0));
   elements.accessory.replaceChildren(...entries.map(([id, data]) => option(id, data.name)));
+}
+
+function setFieldAvailability(field, control, available, unavailableText) {
+  field.classList.toggle('is-unavailable', !available);
+  control.disabled = !available;
+
+  if (available) {
+    delete field.dataset.unavailable;
+    control.removeAttribute('aria-label');
+    control.removeAttribute('title');
+    return;
+  }
+
+  field.dataset.unavailable = unavailableText;
+  const fieldName = field.querySelector('span')?.textContent || control.name;
+  control.setAttribute('aria-label', `${fieldName}: ${unavailableText}`);
+  control.setAttribute('title', unavailableText);
 }
 
 function loadStateFromUrl() {
@@ -201,29 +221,58 @@ function referenceObjectAnchor(system) {
   };
 }
 
+/*
+ * Preview unit contract:
+ * - The outer sensor SVG uses sensor-plane millimetres as its user units.
+ * - Reference-object data uses real subject-space millimetres.
+ * - Projected size on the sensor is subject size × optical magnification.
+ *
+ * Keeping source artwork inside a nested SVG isolates its arbitrary vector or
+ * raster coordinates from the sensor coordinate system. A future raster subject
+ * can pass imageHref instead of vectorMarkup, provided the source file is tightly
+ * cropped, artworkViewBox is [0, 0, pixelWidth, pixelHeight], and lengthMm
+ * describes the crop's horizontal specimen length.
+ */
+function referenceArtworkMarkup({ subject, system, magnification, vectorMarkup = '', imageHref = null }) {
+  const [sourceX, sourceY, sourceWidth, sourceHeight] = subject.artworkViewBox ?? [];
+  if (![sourceX, sourceY, sourceWidth, sourceHeight].every(Number.isFinite)) return '';
+  if (sourceWidth <= 0 || sourceHeight <= 0 || !Number.isFinite(subject.lengthMm)) return '';
+
+  const projectedWidth = subject.lengthMm * magnification;
+  const projectedHeight = projectedWidth * sourceHeight / sourceWidth;
+  const anchor = referenceObjectAnchor(system);
+  const x = anchor.x - projectedWidth / 2;
+  const y = anchor.y - projectedHeight / 2;
+  const content = imageHref
+    ? `<image href="${svgEscape(imageHref)}" x="${sourceX}" y="${sourceY}" width="${sourceWidth}" height="${sourceHeight}" preserveAspectRatio="none"></image>`
+    : vectorMarkup;
+
+  return `
+    <svg x="${x}" y="${y}" width="${projectedWidth}" height="${projectedHeight}" viewBox="${sourceX} ${sourceY} ${sourceWidth} ${sourceHeight}" preserveAspectRatio="xMidYMid meet" overflow="visible" aria-hidden="true">
+      ${content}
+    </svg>`;
+}
+
 function drawCameraObjects(system, result) {
   const m = result.magnification;
   const { banana, quarter, rice } = REFERENCE_OBJECTS;
   const cx = system.sensorWidth / 2;
   const cy = system.sensorHeight / 2;
 
-  const bananaW = banana.lengthMm * m;
-  // The artwork has its own silhouette proportions. Scale it uniformly from
-  // the reference length so the banana is not stretched to a data rectangle.
-  const bananaScale = bananaW / 767;
-  const bananaH = 430 * bananaScale;
-  const bananaX = cx - bananaW / 2;
-  const bananaY = cy - bananaH / 2;
   const quarterR = quarter.diameterMm * m / 2;
   const riceW = rice.widthMm * m;
   const riceH = rice.lengthMm * m;
   const riceAnchor = referenceObjectAnchor(system);
+  const bananaMarkup = referenceArtworkMarkup({
+    subject: banana,
+    system,
+    magnification: m,
+    vectorMarkup: '<path class="preview-banana object-outline" d="M 36 0 C 38 0 44 0 47 4 C 56 13 61 25 66 43 C 72 66 76 92 91 111 C 130 159 193 201 242 230 C 283 254 344 264 402 259 C 463 254 527 233 584 205 C 630 182 677 156 708 133 C 723 122 727 108 741 108 C 751 108 763 119 767 131 C 771 142 763 151 756 161 C 746 176 743 202 733 231 C 719 274 693 311 659 341 C 615 380 562 405 504 418 C 438 433 360 434 293 424 C 233 415 179 393 133 361 C 85 328 48 293 35 253 C 24 218 28 181 32 146 C 37 109 27 85 17 64 C 8 47 -2 33 3 25 C 10 15 24 6 36 0 Z"></path>'
+  });
 
   elements.objectLayer.innerHTML = `
     <circle class="preview-quarter object-outline" cx="${cx}" cy="${cy}" r="${quarterR}"></circle>
-    <g transform="translate(${bananaX} ${bananaY}) scale(${bananaScale})">
-      <path class="preview-banana object-outline" d="M 36 0 C 38 0 44 0 47 4 C 56 13 61 25 66 43 C 72 66 76 92 91 111 C 130 159 193 201 242 230 C 283 254 344 264 402 259 C 463 254 527 233 584 205 C 630 182 677 156 708 133 C 723 122 727 108 741 108 C 751 108 763 119 767 131 C 771 142 763 151 756 161 C 746 176 743 202 733 231 C 719 274 693 311 659 341 C 615 380 562 405 504 418 C 438 433 360 434 293 424 C 233 415 179 393 133 361 C 85 328 48 293 35 253 C 24 218 28 181 32 146 C 37 109 27 85 17 64 C 8 47 -2 33 3 25 C 10 15 24 6 36 0 Z"></path>
-    </g>
+    ${bananaMarkup}
     <ellipse class="preview-rice object-outline" cx="${riceAnchor.x}" cy="${riceAnchor.y}" rx="${riceW / 2}" ry="${riceH / 2}" transform="rotate(12 ${riceAnchor.x} ${riceAnchor.y})"></ellipse>
   `;
 
@@ -237,20 +286,17 @@ function drawObjectiveObjects(system, result) {
   const cy = system.sensorHeight / 2;
   const quarterR = quarter.diameterMm * m / 2;
   const targetSize = target.sizeMm * m;
-  // The source artwork is horizontal. Normalize its visible bounds so the
-  // declared 0.4 mm length maps to the nose-to-tail axis, not the SVG canvas.
-  const tardiViewBox = { x: 14, y: 30, width: 172, height: 113 };
-  const tardiW = tardigrade.lengthMm * m;
-  const tardiH = tardiW * tardiViewBox.height / tardiViewBox.width;
   const riceW = rice.widthMm * m;
   const riceH = rice.lengthMm * m;
   const riceAnchor = referenceObjectAnchor(system);
   const showTardigrade = m >= 10;
   const targetMarkup = showTardigrade ? '' : `
     <rect class="preview-target object-outline" x="${cx - targetSize / 2}" y="${cy - targetSize / 2}" width="${targetSize}" height="${targetSize}"></rect>`;
-  const tardigradeMarkup = showTardigrade ? `
-    <svg x="${cx - tardiW / 2}" y="${cy - tardiH / 2}" width="${tardiW}" height="${tardiH}" viewBox="${tardiViewBox.x} ${tardiViewBox.y} ${tardiViewBox.width} ${tardiViewBox.height}" preserveAspectRatio="xMidYMid meet" overflow="visible" aria-hidden="true">
-      <g transform="translate(3 6) translate(100 80) scale(1.05) translate(-100 -80)">
+  const tardigradeMarkup = showTardigrade ? referenceArtworkMarkup({
+    subject: tardigrade,
+    system,
+    magnification: m,
+    vectorMarkup: `
         <path class="preview-tardigrade" d="M126 31 L147 32 L165 37 L171 50 L175 60 L166 72 L155 82 L144 87 L139 100 L142 109 L134 102 L130 101 L126 107 L124 98 L119 96 L119 113 L113 110 L99 99 L93 101 L90 112 L93 118 L82 116 L77 111 L68 107 L55 115 L54 106 L45 119 L41 130 L38 114 L32 118 L30 115 L26 124 L25 115 L21 125 L21 118 L26 112 L19 94 L20 87 L24 75 L37 60 L49 51 L67 42 L94 35 L114 35 Z"></path>
         <polyline class="preview-tardigrade-detail" points="26.83,107.37 34.51,103.53 38.67,109.93 41.22,113.12 47.30,112.81"></polyline>
         <polyline class="preview-tardigrade-detail" points="53.05,101.61 48.58,91.06 60.41,88.83 66.80,90.74"></polyline>
@@ -261,9 +307,8 @@ function drawObjectiveObjects(system, result) {
         <polyline class="preview-tardigrade-detail" points="174.64,59.40 167.94,60.32 167.03,50.57 170.37,52.40"></polyline>
         <polyline class="preview-tardigrade-detail" points="163.07,72.19 153.63,60.01 151.80,46.62"></polyline>
         <line class="preview-tardigrade-detail" x1="101.93" y1="98.82" x2="113.50" y2="95.78"></line>
-        <polyline class="preview-tardigrade-detail" points="56.25,102.47 63.56,104.91 71.48,97.60"></polyline>
-      </g>
-    </svg>` : '';
+        <polyline class="preview-tardigrade-detail" points="56.25,102.47 63.56,104.91 71.48,97.60"></polyline>`
+  }) : '';
 
   elements.objectLayer.innerHTML = `
     <circle class="preview-quarter object-outline" cx="${cx}" cy="${cy}" r="${quarterR}"></circle>
@@ -551,14 +596,26 @@ function magnificationCandidates() {
   for (const [lensId, lens] of Object.entries(system.lenses ?? {})) {
     const result = calculateCameraSetup({ system, lens, accessory, aperture, megapixels });
     if (result.valid && Number.isFinite(result.magnification) && result.magnification > 0) {
-      candidates.push({ lensId, magnification: result.magnification, label: lens.name });
+      candidates.push({
+        lensId,
+        magnification: result.magnification,
+        workingDistanceMm: result.workingDistanceMm,
+        kind: 'lens',
+        label: lens.name
+      });
     }
   }
 
   for (const [lensId, objective] of Object.entries(MICROSCOPE_OBJECTIVES_DATA)) {
     const result = calculateObjectiveSetup({ system, objective, megapixels });
     if (result.valid && Number.isFinite(result.magnification) && result.magnification > 0) {
-      candidates.push({ lensId, magnification: result.magnification, label: objective.name });
+      candidates.push({
+        lensId,
+        magnification: result.magnification,
+        workingDistanceMm: result.workingDistanceMm,
+        kind: 'objective',
+        label: objective.name
+      });
     }
   }
 
@@ -573,6 +630,59 @@ function selectedSetupLabel(objective, lens) {
   return accessory.type === 'none' ? name : `${name} + ${accessory.name}`;
 }
 
+function sameMagnification(a, b) {
+  return Number.isFinite(a) && Number.isFinite(b) && Math.abs(Math.log(a / b)) <= 1e-12;
+}
+
+function compareEquivalentCandidates(a, b) {
+  const aDistance = Number.isFinite(a.workingDistanceMm) && a.workingDistanceMm > 0
+    ? a.workingDistanceMm
+    : -Infinity;
+  const bDistance = Number.isFinite(b.workingDistanceMm) && b.workingDistanceMm > 0
+    ? b.workingDistanceMm
+    : -Infinity;
+  return bDistance - aDistance || a.label.localeCompare(b.label);
+}
+
+function equivalentOptionLabel(candidate) {
+  if (!Number.isFinite(candidate.workingDistanceMm) || candidate.workingDistanceMm <= 0) {
+    return `${candidate.label} — WD unknown`;
+  }
+
+  const digits = candidate.workingDistanceMm < 10 ? 2 : 1;
+  return `${candidate.label} — WD ${formatMm(candidate.workingDistanceMm, digits)}`;
+}
+
+function renderEquivalentPicker(candidates, target) {
+  const equivalents = closestMagnificationCandidates(candidates, target)
+    .sort(compareEquivalentCandidates);
+
+  if (!equivalents.length) {
+    elements.magnificationMatch.textContent = 'No valid setup available';
+    elements.equivalentLens.replaceChildren(option('', '—'));
+    elements.equivalentLens.disabled = true;
+    return;
+  }
+
+  const magnification = equivalents[0].magnification;
+  const allObjectives = equivalents.every((candidate) => candidate.kind === 'objective');
+  const allLenses = equivalents.every((candidate) => candidate.kind === 'lens');
+  const equivalentType = allObjectives ? 'objectives' : allLenses ? 'lenses' : 'setups';
+  const equivalentCount = equivalents.length > 1
+    ? ` · ${equivalents.length} equivalent ${equivalentType}`
+    : '';
+  elements.magnificationMatch.textContent = `Closest available · ${formatMag(magnification)}${equivalentCount}`;
+  elements.equivalentLens.replaceChildren(
+    ...equivalents.map((candidate) => option(candidate.lensId, equivalentOptionLabel(candidate)))
+  );
+
+  const selectedIsEquivalent = equivalents.some((candidate) => candidate.lensId === elements.lens.value);
+  elements.equivalentLens.value = selectedIsEquivalent
+    ? elements.lens.value
+    : equivalents[0].lensId;
+  elements.equivalentLens.disabled = equivalents.length === 1;
+}
+
 function renderMagnificationPicker(result, objective, lens) {
   const candidates = magnificationCandidates();
   if (!candidates.length) {
@@ -580,7 +690,7 @@ function renderMagnificationPicker(result, objective, lens) {
     elements.magnificationTarget.textContent = '—';
     elements.magnificationMin.textContent = '—';
     elements.magnificationMax.textContent = '—';
-    elements.magnificationMatch.textContent = 'No valid lenses are available for this setup.';
+    renderEquivalentPicker([], 1);
     return;
   }
 
@@ -599,24 +709,34 @@ function renderMagnificationPicker(result, objective, lens) {
   elements.magnificationTarget.textContent = formatMag(target);
   elements.magnificationMin.textContent = formatMag(minimum);
   elements.magnificationMax.textContent = formatMag(maximum);
+  renderEquivalentPicker(candidates, target);
 
   if (result.valid) {
-    const prefix = requestedMagnification == null ? 'Current maximum' : 'Closest maximum';
     const setup = selectedSetupLabel(objective, lens);
-    elements.magnificationMatch.textContent = `${prefix}: ${formatMag(result.magnification)} · ${setup}`;
     elements.magnificationSlider.setAttribute(
       'aria-valuetext',
       `Target ${formatMag(target)}; closest ${formatMag(result.magnification)} with ${setup}`
     );
   } else {
-    elements.magnificationMatch.textContent = result.reason;
-    elements.magnificationSlider.setAttribute('aria-valuetext', `Target ${formatMag(target)}`);
+    elements.magnificationSlider.setAttribute('aria-valuetext', `Target ${formatMag(target)}; ${result.reason}`);
   }
 }
 
 function handleMagnificationInput() {
   const target = 10 ** Number(elements.magnificationSlider.value);
-  const candidate = closestMagnificationCandidate(magnificationCandidates(), target, elements.lens.value);
+  const candidates = magnificationCandidates();
+  const equivalents = closestMagnificationCandidates(candidates, target);
+  if (!equivalents.length) return;
+
+  const magnification = equivalents[0].magnification;
+  if (equivalentPreference && !sameMagnification(equivalentPreference.magnification, magnification)) {
+    equivalentPreference = null;
+  }
+
+  const preferred = equivalentPreference
+    ? equivalents.find((candidate) => candidate.lensId === equivalentPreference.lensId)
+    : null;
+  const candidate = preferred || closestMagnificationCandidate(equivalents, target);
   if (!candidate) return;
 
   requestedMagnification = target;
@@ -634,8 +754,18 @@ function render() {
   const result = calculate();
   if (!system || !result) return;
 
-  elements.accessoryField.hidden = Boolean(objective) || lockAccessory;
-  elements.apertureField.hidden = Boolean(objective);
+  setFieldAvailability(
+    elements.accessoryField,
+    elements.accessory,
+    !objective && !lockAccessory,
+    objective ? 'Not applicable' : 'Unavailable for this lens'
+  );
+  setFieldAvailability(
+    elements.apertureField,
+    elements.aperture,
+    !objective,
+    'Set by objective'
+  );
 
   renderSensor(system, result);
   renderResults(result, objective, lens);
@@ -646,6 +776,7 @@ function render() {
 
 function handleSystemChange() {
   requestedMagnification = null;
+  equivalentPreference = null;
   const previousLens = elements.lens.value;
   populateLenses(previousLens);
   const system = currentSystem();
@@ -663,10 +794,12 @@ loadStateFromUrl();
 
 elements.lens.addEventListener('change', () => {
   requestedMagnification = null;
+  equivalentPreference = null;
   render();
 });
 elements.accessory.addEventListener('change', () => {
   requestedMagnification = null;
+  equivalentPreference = null;
   render();
 });
 elements.aperture.addEventListener('input', render);
@@ -676,6 +809,18 @@ elements.megapixels.addEventListener('input', () => {
 });
 elements.system.addEventListener('change', handleSystemChange);
 elements.magnificationSlider.addEventListener('input', handleMagnificationInput);
+elements.equivalentLens.addEventListener('change', () => {
+  const candidate = magnificationCandidates()
+    .find((item) => item.lensId === elements.equivalentLens.value);
+  if (!candidate) return;
+
+  equivalentPreference = {
+    lensId: candidate.lensId,
+    magnification: candidate.magnification
+  };
+  elements.lens.value = candidate.lensId;
+  render();
+});
 window.addEventListener('resize', render);
 
 render();

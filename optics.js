@@ -1,24 +1,40 @@
 const GREEN_WAVELENGTH_UM = 0.55;
 const DIN_160_IMAGE_DISTANCE_MM = 150;
+const MAGNIFICATION_EPSILON = 1e-12;
 
 function positiveNumber(value) {
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? number : null;
 }
 
-export function closestMagnificationCandidate(candidates, target, preferredLensId = null) {
+export function closestMagnificationCandidates(candidates, target) {
   const desired = positiveNumber(target);
-  if (!desired || !Array.isArray(candidates)) return null;
+  if (!desired || !Array.isArray(candidates)) return [];
 
-  return candidates.reduce((best, candidate) => {
-    if (!positiveNumber(candidate?.magnification)) return best;
-    if (!best) return candidate;
+  const validCandidates = candidates.filter((candidate) => positiveNumber(candidate?.magnification));
+  if (!validCandidates.length) return [];
 
-    // Magnification is multiplicative, so compare ratios: 0.5× → 1× is the
-    // same slider distance as 1× → 2×.
+  const closest = validCandidates.reduce((best, candidate) => {
     const distance = Math.abs(Math.log(candidate.magnification / desired));
     const bestDistance = Math.abs(Math.log(best.magnification / desired));
-    if (Math.abs(distance - bestDistance) > 1e-12) return distance < bestDistance ? candidate : best;
+    return distance < bestDistance ? candidate : best;
+  });
+
+  return validCandidates.filter((candidate) => (
+    Math.abs(Math.log(candidate.magnification / closest.magnification)) <= MAGNIFICATION_EPSILON
+  ));
+}
+
+export function closestMagnificationCandidate(candidates, target, preferredLensId = null) {
+  const equivalents = closestMagnificationCandidates(candidates, target);
+  if (!equivalents.length) return null;
+
+  return equivalents.reduce((best, candidate) => {
+    if (!best) return candidate;
+
+    const workingDistance = positiveNumber(candidate.workingDistanceMm) ?? -Infinity;
+    const bestWorkingDistance = positiveNumber(best.workingDistanceMm) ?? -Infinity;
+    if (workingDistance !== bestWorkingDistance) return workingDistance > bestWorkingDistance ? candidate : best;
 
     if (candidate.lensId === preferredLensId && best.lensId !== preferredLensId) return candidate;
     return best;

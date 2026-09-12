@@ -3,15 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="A compact macro and microscope-objective magnification calculator.">
-  <title>Lens Magnification</title>
+  <meta name="description" content="An interactive macrophotography and microscope-objective simulator.">
+  <title>Macrophotography Simulator</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <main class="shell">
     <header class="masthead">
       <div>
-        <h1>Lens Magnification</h1>
+        <h1>Macrophotography Simulator</h1>
         <p>Macro lenses, extension tubes, close-up lenses, reversed lenses and finite microscope objectives.</p>
       </div>
       <a href="https://github.com/voshart/lens-magnification">source</a>
@@ -71,7 +71,12 @@
             <span id="magnification-min">—</span>
             <span id="magnification-max">—</span>
           </div>
-          <p class="magnification-match" id="magnification-match" aria-live="polite"></p>
+          <label class="magnification-match" id="equivalent-picker">
+            <span id="magnification-match" aria-live="polite">Closest available</span>
+            <select id="equivalent-lens">
+              <option>—</option>
+            </select>
+          </label>
         </section>
         <figcaption>
           <span id="sensor-caption">Select a lens.</span>

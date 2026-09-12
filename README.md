@@ -1,4 +1,4 @@
-# Lens Magnification
+# Macrophotography Simulator
 
 An interactive calculator for exploring macro-lens and finite microscope-objective setups. It estimates how a selected lens, sensor, accessory, aperture, and resolution affect magnification and the resulting image.
 
@@ -33,6 +33,20 @@ Then open <http://localhost:8000>.
 - `app.js` — interface state, rendering, and interactions
 - `optics.js` — optical calculations
 - `data.js` — camera, lens, objective, accessory, and reference-object data
+
+## Preview coordinate system
+
+The sensor preview has an explicit unit contract:
+
+- One outer SVG user unit represents one millimetre on the sensor/image plane.
+- Reference-object dimensions in `data.js` are real subject-space millimetres.
+- Rendered size is `subject dimension × magnification`.
+- Reference objects share a sensor-centred anchor so changing magnification cannot make them drift.
+- The optical-rig diagram below the preview is schematic and is not drawn at a constant millimetre scale.
+
+Illustrated subjects declare a tightly cropped `artworkViewBox`. The renderer maps the declared `lengthMm` onto the full horizontal width of that box while preserving its aspect ratio. Avoid corrective transforms or visual padding inside the artwork because they make the visible specimen smaller than its declared size.
+
+Raster assets can use the same SVG wrapper via an `<image>` element. Crop the source file tightly, set `artworkViewBox` to `[0, 0, pixelWidth, pixelHeight]`, give the specimen a defensible real-world `lengthMm`, and let the shared renderer perform the magnification scaling. PNG or WebP is preferable when a transparent background is required; JPEG is supported but retains its rectangular background.
 
 ## Accuracy
 

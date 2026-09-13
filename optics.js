@@ -111,9 +111,26 @@ function cameraMagnification(lens, accessory) {
   }
 }
 
+function closeUpWorkingDistanceAtNativeFocus(system, lens, accessory) {
+  const nativeWd = nativeWorkingDistance(system, lens);
+  const powerPerMm = (positiveNumber(accessory.power) ?? 0) / 1000;
+  if (!nativeWd || !powerPerMm) return null;
+
+  // First-order vergence estimate at the host lens's native close-focus setting.
+  // Native WD is measured from the host-lens front; the close-up attachment is
+  // approximated as thin and in contact at that plane.
+  const combinedVergencePerMm = 1 / nativeWd + powerPerMm;
+  const wd = 1 / combinedVergencePerMm;
+  return wd > 0 ? wd : null;
+}
+
 function cameraWorkingDistance(system, lens, accessory, magnification) {
   if (!magnification || magnification <= 0) return null;
-  if (accessory.type === 'reversal' || accessory.type === 'diopter' || isZoomLens(lens)) return null;
+  if (accessory.type === 'reversal' || isZoomLens(lens)) return null;
+
+  if (accessory.type === 'diopter') {
+    return closeUpWorkingDistanceAtNativeFocus(system, lens, accessory);
+  }
 
   const f = positiveNumber(lens.f);
   const nativeMag = positiveNumber(lens.NM);
@@ -234,11 +251,13 @@ export function calculateCameraSetup({ system, lens, accessory, aperture, megapi
     warnings.push(zoom
       ? 'Working distance is not modeled for zoom lenses because published dimensions and maximum magnification can refer to different zoom positions.'
       : accessory.type === 'diopter'
-        ? 'Working distance is not shown for the close-up lens because the attachment shifts the combined system principal planes.'
+        ? 'Close-up-lens working distance cannot be estimated because the host lens native working distance is unavailable or too uncertain.'
         : 'Working distance is unavailable or too uncertain for this lens/setup.');
   }
   if (accessory.type === 'diopter') {
-    warnings.push('Close-up-lens magnification uses a thin-lens, in-contact approximation with the camera lens at native close focus. Actual working distance depends on the attachment design, spacing, host lens, and focus setting; manufacturer distance ranges are reference-only and are not simulated.');
+    warnings.push(workingDistanceMm == null
+      ? 'Close-up-lens magnification still uses a thin-lens, in-contact approximation with the camera lens at native close focus; actual distance depends on attachment design, spacing, host lens, and focus setting.'
+      : 'Close-up-lens working distance is a first-order estimate at the host lens’s native close-focus / maximum-magnification setting. It combines the host native working distance with nominal diopter power and approximates the attachment as thin and in contact at the lens front; real attachment thickness, spacing, principal planes, and internal focusing can shift the result.');
   }
   if (accessory.type === 'tube') {
     warnings.push('Extension-tube estimates assume nominal focal length and pupil magnification = 1 at the lens’s published native maximum magnification.');

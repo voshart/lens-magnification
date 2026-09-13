@@ -36,6 +36,7 @@ const elements = {
   notes: $('notes'),
   imageCircleResult: $('image-circle-result'),
   magnificationSlider: $('magnification-slider'),
+  magnificationNotches: $('magnification-notches'),
   magnificationTarget: $('magnification-target'),
   magnificationMin: $('magnification-min'),
   magnificationMax: $('magnification-max'),
@@ -446,13 +447,14 @@ function renderRig(system, lensOrObjective, accessory, result) {
     const lensLength = lensOrObjective.PL ?? 60;
     const extension = accessory.type === 'tube' ? (accessory.length ?? 0) : 0;
     const isCloseUp = accessory.type === 'diopter';
+    const isEstimatedDistance = accessory.type === 'tube' || isCloseUp;
     const power = Number(accessory.power);
     const flange = system.flangeDistance ?? 18;
     const wdLabel = wd == null
       ? 'WD unknown'
-      : `${isCloseUp ? 'WD ≈' : 'WD '}${formatMm(wd, 0)}`;
+      : `${isEstimatedDistance ? 'WD ≈' : 'WD '}${formatMm(wd, 0)}`;
     blocks = [
-      { label: wdLabel, value: wd ?? Math.max(lensLength * 0.8, 30), type: 'space', uncertain: wd == null || isCloseUp },
+      { label: wdLabel, value: wd ?? Math.max(lensLength * 0.8, 30), type: 'space', uncertain: wd == null || isEstimatedDistance },
       ...(isCloseUp ? [{ label: Number.isFinite(power) ? `+${power} D` : 'diopter', value: 1, type: 'block' }] : []),
       { label: 'lens', value: lensLength, type: 'block', uncertain: !lensOrObjective.PL },
       ...(extension > 0 ? [{ label: `${extension} mm`, value: extension, type: 'block' }] : []),
@@ -570,9 +572,11 @@ function renderResults(result, objective, lens) {
   out.fov.textContent = formatFov(result.fov);
   const wdDigits = Number.isFinite(result.workingDistanceMm) && result.workingDistanceMm < 10 ? 2 : 0;
   const wdText = formatMm(result.workingDistanceMm, wdDigits);
-  out.wd.textContent = accessory.type === 'diopter' && result.workingDistanceMm != null ? `≈${wdText}` : wdText;
+  const estimatedAccessoryDistance = result.type === 'camera'
+    && (accessory.type === 'tube' || accessory.type === 'diopter');
+  out.wd.textContent = estimatedAccessoryDistance && result.workingDistanceMm != null ? `≈${wdText}` : wdText;
   const totalText = formatMm(result.sensorToSubjectMm, 0);
-  out.total.textContent = accessory.type === 'diopter' && result.sensorToSubjectMm != null ? `≈${totalText}` : totalText;
+  out.total.textContent = estimatedAccessoryDistance && result.sensorToSubjectMm != null ? `≈${totalText}` : totalText;
   out.effective.textContent = `f/${result.effectiveFNumber.toFixed(1)}`;
   out.dof.textContent = formatMm(result.dofMm, result.dofMm < 1 ? 2 : 1);
   out.pitch.textContent = result.pixelPitchUm ? `${result.pixelPitchUm.toFixed(2)} µm` : '—';
@@ -691,6 +695,32 @@ function sameMagnification(a, b) {
   return Number.isFinite(a) && Number.isFinite(b) && Math.abs(Math.log(a / b)) <= 1e-12;
 }
 
+function distinctMagnifications(candidates) {
+  return candidates.reduce((magnifications, candidate) => {
+    const previous = magnifications[magnifications.length - 1];
+    if (previous == null || !sameMagnification(previous, candidate.magnification)) {
+      magnifications.push(candidate.magnification);
+    }
+    return magnifications;
+  }, []);
+}
+
+function renderMagnificationNotches(candidates, minimum, maximum) {
+  const magnifications = distinctMagnifications(candidates);
+  const sliderMinimum = Math.log10(minimum);
+  const sliderRange = Math.log10(maximum) - sliderMinimum;
+
+  elements.magnificationNotches.replaceChildren(...magnifications.map((magnification) => {
+    const notch = document.createElement('span');
+    const position = sliderRange > 0
+      ? (Math.log10(magnification) - sliderMinimum) / sliderRange
+      : 0.5;
+    notch.className = 'magnification-notch';
+    notch.style.left = `${position * 100}%`;
+    return notch;
+  }));
+}
+
 function compareEquivalentCandidates(a, b) {
   const aDistance = Number.isFinite(a.workingDistanceMm) && a.workingDistanceMm > 0
     ? a.workingDistanceMm
@@ -707,7 +737,10 @@ function equivalentOptionLabel(candidate) {
   }
 
   const digits = candidate.workingDistanceMm < 10 ? 2 : 1;
-  const prefix = MACRO_ACCESSORIES_DATA[elements.accessory.value]?.type === 'diopter' ? '≈' : '';
+  const accessoryType = MACRO_ACCESSORIES_DATA[elements.accessory.value]?.type;
+  const estimated = candidate.kind === 'lens'
+    && (accessoryType === 'tube' || accessoryType === 'diopter');
+  const prefix = estimated ? '≈' : '';
   return `${candidate.label} — WD ${prefix}${formatMm(candidate.workingDistanceMm, digits)}`;
 }
 
@@ -745,6 +778,7 @@ function renderMagnificationPicker(result, objective, lens) {
   const candidates = magnificationCandidates();
   if (!candidates.length) {
     elements.magnificationSlider.disabled = true;
+    elements.magnificationNotches.replaceChildren();
     elements.magnificationTarget.textContent = '—';
     elements.magnificationMin.textContent = '—';
     elements.magnificationMax.textContent = '—';
@@ -763,25 +797,26 @@ function renderMagnificationPicker(result, objective, lens) {
   elements.magnificationSlider.min = sliderMinimum.toString();
   elements.magnificationSlider.max = sliderMaximum.toString();
   elements.magnificationSlider.value = Math.log10(target).toString();
-  elements.magnificationTarget.value = formatMag(target);
-  elements.magnificationTarget.textContent = formatMag(target);
+  const selectedMagnification = result.valid ? formatMag(result.magnification) : '—';
+  elements.magnificationTarget.value = selectedMagnification;
+  elements.magnificationTarget.textContent = selectedMagnification;
   elements.magnificationMin.textContent = formatMag(minimum);
   elements.magnificationMax.textContent = formatMag(maximum);
+  renderMagnificationNotches(candidates, minimum, maximum);
   renderEquivalentPicker(candidates, target);
 
   if (result.valid) {
     const setup = selectedSetupLabel(objective, lens);
     elements.magnificationSlider.setAttribute(
       'aria-valuetext',
-      `Target ${formatMag(target)}; closest ${formatMag(result.magnification)} with ${setup}`
+      `Selected ${formatMag(result.magnification)} with ${setup}`
     );
   } else {
-    elements.magnificationSlider.setAttribute('aria-valuetext', `Target ${formatMag(target)}; ${result.reason}`);
+    elements.magnificationSlider.setAttribute('aria-valuetext', `No setup selected; ${result.reason}`);
   }
 }
 
-function handleMagnificationInput() {
-  const target = 10 ** Number(elements.magnificationSlider.value);
+function selectMagnificationTarget(target) {
   const candidates = magnificationCandidates();
   const equivalents = closestMagnificationCandidates(candidates, target);
   if (!equivalents.length) return;
@@ -800,6 +835,46 @@ function handleMagnificationInput() {
   requestedMagnification = target;
   elements.lens.value = candidate.lensId;
   render();
+}
+
+function handleMagnificationInput() {
+  selectMagnificationTarget(10 ** Number(elements.magnificationSlider.value));
+}
+
+function handleMagnificationCommit() {
+  const target = 10 ** Number(elements.magnificationSlider.value);
+  const equivalents = closestMagnificationCandidates(magnificationCandidates(), target);
+  if (!equivalents.length) return;
+  selectMagnificationTarget(equivalents[0].magnification);
+}
+
+function handleMagnificationKeydown(event) {
+  const direction = {
+    ArrowLeft: -1,
+    ArrowDown: -1,
+    ArrowRight: 1,
+    ArrowUp: 1
+  }[event.key];
+  const magnifications = distinctMagnifications(magnificationCandidates());
+  if (!magnifications.length) return;
+
+  let target = null;
+  if (event.key === 'Home') target = magnifications[0];
+  if (event.key === 'End') target = magnifications[magnifications.length - 1];
+
+  const current = 10 ** Number(elements.magnificationSlider.value);
+  if (direction < 0) {
+    target = [...magnifications].reverse().find((magnification) => magnification < current && !sameMagnification(magnification, current))
+      ?? magnifications[0];
+  }
+  if (direction > 0) {
+    target = magnifications.find((magnification) => magnification > current && !sameMagnification(magnification, current))
+      ?? magnifications[magnifications.length - 1];
+  }
+
+  if (target == null) return;
+  event.preventDefault();
+  selectMagnificationTarget(target);
 }
 
 function render() {
@@ -867,6 +942,8 @@ elements.megapixels.addEventListener('input', () => {
 });
 elements.system.addEventListener('change', handleSystemChange);
 elements.magnificationSlider.addEventListener('input', handleMagnificationInput);
+elements.magnificationSlider.addEventListener('change', handleMagnificationCommit);
+elements.magnificationSlider.addEventListener('keydown', handleMagnificationKeydown);
 elements.equivalentLens.addEventListener('change', () => {
   const candidate = magnificationCandidates()
     .find((item) => item.lensId === elements.equivalentLens.value);

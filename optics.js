@@ -260,7 +260,7 @@ export function calculateCameraSetup({ system, lens, accessory, aperture, megapi
       : 'Close-up-lens working distance is a first-order estimate at the host lens’s native close-focus / maximum-magnification setting. It combines the host native working distance with nominal diopter power and approximates the attachment as thin and in contact at the lens front; real attachment thickness, spacing, principal planes, and internal focusing can shift the result.');
   }
   if (accessory.type === 'tube') {
-    warnings.push('Extension-tube estimates assume nominal focal length and pupil magnification = 1 at the lens’s published native maximum magnification.');
+    warnings.push('Extension-tube magnification and distance estimates assume the lens remains at its published native maximum-magnification setting, with nominal focal length and fixed principal-plane/front-barrel geometry.');
   }
   if (accessory.type === 'reversal') {
     warnings.push('Reversed-lens magnification is a legacy prototype estimate, not a catalog specification; working distance and pupil magnification are not modeled.');

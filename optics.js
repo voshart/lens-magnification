@@ -238,7 +238,7 @@ export function calculateCameraSetup({ system, lens, accessory, aperture, megapi
         : 'Working distance is unavailable or too uncertain for this lens/setup.');
   }
   if (accessory.type === 'diopter') {
-    warnings.push('Close-up-lens magnification uses a thin-lens, in-contact approximation with the camera lens at native close focus; published close-up-lens distance figures may instead assume the host lens is focused at infinity.');
+    warnings.push('Close-up-lens magnification uses a thin-lens, in-contact approximation with the camera lens at native close focus. Actual working distance depends on the attachment design, spacing, host lens, and focus setting; manufacturer distance ranges are reference-only and are not simulated.');
   }
   if (accessory.type === 'tube') {
     warnings.push('Extension-tube estimates assume nominal focal length and pupil magnification = 1 at the lens’s published native maximum magnification.');

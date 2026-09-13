@@ -52,9 +52,9 @@ Raster assets can use the same SVG wrapper via an `<image>` element. Crop the so
 
 ## Close-up lens catalog policy
 
-Named close-up-lens presets are included only when first-party technical documentation provides enough information to identify the optical power or focal length and the optical construction/correction approach. Achromatic/APO design, element/group count, coatings, recommended host-lens range, and manufacturer working-distance guidance are recorded when published.
+Named close-up-lens presets are included only when first-party technical documentation provides enough information to identify the optical power or focal length and the optical construction/correction approach. Achromatic/APO design, element/group count, coatings, recommended host-lens range, and manufacturer working-distance guidance are recorded when published. Well-documented discontinued products can be retained as explicitly labeled legacy entries.
 
-A missing specification is not treated as proof that a product is poor quality; it simply means the product is not documented well enough for a brand-specific simulator preset. Users can still approximate an undocumented or unbranded close-up lens with a generic power-only entry when an advertised diopter value is known.
+A missing specification is not treated as proof that a product is poor quality or that a manufacturer is concealing something; it simply means the product is not documented well enough for a brand-specific simulator preset. Users can still approximate an undocumented or unbranded close-up lens with a generic power-only entry when an advertised diopter value is known.
 
 Manufacturer image-quality claims and working-distance ranges are provenance only. The simulator does not convert them into an image-quality score or assume that two products with equal nominal diopter power have identical aberrations or physical working distance.
 

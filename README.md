@@ -7,8 +7,10 @@ Live site: <https://macro.voshart.com>
 ## Features
 
 - Camera and sensor presets across multiple lens systems
+- Same-mount full-frame lenses remain available on compatible APS-C mirrorless bodies
 - Macro, close-focus, and high-magnification lens presets
 - Extension-tube, close-up-lens, and reversed-lens estimates
+- Generic +5 D and +9 D close-up-lens presets alongside the sourced Raynox +8 D preset
 - DIN 160 mm finite microscope objectives
 - Target-magnification matching
 - Sensor preview with familiar reference objects
@@ -50,7 +52,7 @@ Raster assets can use the same SVG wrapper via an `<image>` element. Crop the so
 
 ## Accuracy
 
-Results are planning estimates rather than measurements of a physical setup. Some calculations use thin-lens approximations, nominal focal lengths, published manufacturer specifications, or assumed pupil magnification. The interface displays additional warnings when a value is unavailable or especially uncertain.
+Results are planning estimates rather than measurements of a physical setup. Some calculations use thin-lens approximations, nominal focal lengths, published manufacturer specifications, or assumed pupil magnification. Close-up-lens power is modeled independently of optical quality; aberrations, multi-element correction, spacing, and host-lens interactions are not simulated. The interface displays additional warnings when a value is unavailable or especially uncertain.
 
 ## Deployment
 

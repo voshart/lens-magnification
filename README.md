@@ -65,6 +65,10 @@ For close-up lenses on supported prime lenses, working distance at the modeled m
 
 Results are planning estimates rather than measurements of a physical setup. Some calculations use thin-lens approximations, nominal focal lengths, published manufacturer specifications, or assumed pupil magnification. Close-up-lens power is modeled independently of optical quality; aberrations, multi-element correction, spacing, and host-lens interactions are not simulated. Generic close-up presets represent nominal optical power only, with construction, correction, coatings, power tolerance, and image quality treated as unknown. For documented close-up products, manufacturer construction and distance guidance are retained as reference metadata rather than treated as calculated performance. The interface displays additional warnings when a value is unavailable or especially uncertain.
 
+## License
+
+The source code is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE). Noncommercial use, modification, and redistribution are allowed under those terms. Commercial use is not granted under this license. If you want to use this software commercially, contact the repository owner to arrange a separate commercial license.
+
 ## Deployment
 
 The site is deployed at <https://macro.voshart.com> with Cloudflare Pages. Use the repository root as the output directory; no build command is required.

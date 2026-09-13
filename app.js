@@ -129,11 +129,54 @@ function populateLenses(preferredId) {
   elements.lens.value = ids.includes(preferredId) ? preferredId : ids[0] ?? '';
 }
 
+function accessorySortValue(accessory) {
+  if (accessory.type === 'diopter') return Number(accessory.power) || 0;
+  if (accessory.type === 'tube') return Number(accessory.length) || 0;
+  return 0;
+}
+
+function accessoryDisplayName(accessory) {
+  const name = accessory?.name ?? '';
+  if (accessory?.type !== 'diopter') return name;
+  return name
+    .replace(/\s+Close-Up Lens\b/gi, '')
+    .replace(/\s+Close-Up\b/gi, '');
+}
+
 function populateAccessories() {
   const order = { none: 0, tube: 1, diopter: 2, reversal: 3 };
   const entries = Object.entries(MACRO_ACCESSORIES_DATA)
-    .sort(([, a], [, b]) => (order[a.type] ?? 9) - (order[b.type] ?? 9) || (a.length ?? 0) - (b.length ?? 0));
-  elements.accessory.replaceChildren(...entries.map(([id, data]) => option(id, data.name)));
+    .sort(([, a], [, b]) => (
+      (order[a.type] ?? 9) - (order[b.type] ?? 9)
+      || accessorySortValue(a) - accessorySortValue(b)
+      || accessoryDisplayName(a).localeCompare(accessoryDisplayName(b))
+    ));
+
+  const tubeGroup = document.createElement('optgroup');
+  tubeGroup.label = 'Extension tubes';
+  const closeUpGroup = document.createElement('optgroup');
+  closeUpGroup.label = 'Close-up lenses';
+  const otherGroup = document.createElement('optgroup');
+  otherGroup.label = 'Other accessories';
+  let noneOption = option('none', MACRO_ACCESSORIES_DATA.none?.name ?? 'No Accessory');
+
+  for (const [id, data] of entries) {
+    if (data.type === 'none') {
+      noneOption = option(id, data.name);
+      continue;
+    }
+    const group = data.type === 'tube'
+      ? tubeGroup
+      : data.type === 'diopter'
+        ? closeUpGroup
+        : otherGroup;
+    group.append(option(id, accessoryDisplayName(data)));
+  }
+
+  elements.accessory.replaceChildren(noneOption);
+  for (const group of [tubeGroup, closeUpGroup, otherGroup]) {
+    if (group.children.length) elements.accessory.append(group);
+  }
 }
 
 function setFieldAvailability(field, control, available, unavailableText) {
@@ -402,9 +445,15 @@ function renderRig(system, lensOrObjective, accessory, result) {
     const wd = result.workingDistanceMm;
     const lensLength = lensOrObjective.PL ?? 60;
     const extension = accessory.type === 'tube' ? (accessory.length ?? 0) : 0;
+    const isCloseUp = accessory.type === 'diopter';
+    const power = Number(accessory.power);
     const flange = system.flangeDistance ?? 18;
+    const wdLabel = wd == null
+      ? 'WD unknown'
+      : `${isCloseUp ? 'WD ≈' : 'WD '}${formatMm(wd, 0)}`;
     blocks = [
-      { label: wd == null ? 'WD unknown' : `WD ${formatMm(wd, 0)}`, value: wd ?? Math.max(lensLength * 0.8, 30), type: 'space', uncertain: wd == null },
+      { label: wdLabel, value: wd ?? Math.max(lensLength * 0.8, 30), type: 'space', uncertain: wd == null || isCloseUp },
+      ...(isCloseUp ? [{ label: Number.isFinite(power) ? `+${power} D` : 'diopter', value: 1, type: 'block' }] : []),
       { label: 'lens', value: lensLength, type: 'block', uncertain: !lensOrObjective.PL },
       ...(extension > 0 ? [{ label: `${extension} mm`, value: extension, type: 'block' }] : []),
       { label: `${flange} mm`, value: flange, type: 'block' }
@@ -520,8 +569,10 @@ function renderResults(result, objective, lens) {
   out.mag.textContent = formatMag(result.magnification);
   out.fov.textContent = formatFov(result.fov);
   const wdDigits = Number.isFinite(result.workingDistanceMm) && result.workingDistanceMm < 10 ? 2 : 0;
-  out.wd.textContent = formatMm(result.workingDistanceMm, wdDigits);
-  out.total.textContent = formatMm(result.sensorToSubjectMm, 0);
+  const wdText = formatMm(result.workingDistanceMm, wdDigits);
+  out.wd.textContent = accessory.type === 'diopter' && result.workingDistanceMm != null ? `≈${wdText}` : wdText;
+  const totalText = formatMm(result.sensorToSubjectMm, 0);
+  out.total.textContent = accessory.type === 'diopter' && result.sensorToSubjectMm != null ? `≈${totalText}` : totalText;
   out.effective.textContent = `f/${result.effectiveFNumber.toFixed(1)}`;
   out.dof.textContent = formatMm(result.dofMm, result.dofMm < 1 ? 2 : 1);
   out.pitch.textContent = result.pixelPitchUm ? `${result.pixelPitchUm.toFixed(2)} µm` : '—';
@@ -633,7 +684,7 @@ function selectedSetupLabel(objective, lens) {
   if (objective) return name;
 
   const accessory = MACRO_ACCESSORIES_DATA[elements.accessory.value] ?? MACRO_ACCESSORIES_DATA.none;
-  return accessory.type === 'none' ? name : `${name} + ${accessory.name}`;
+  return accessory.type === 'none' ? name : `${name} + ${accessoryDisplayName(accessory)}`;
 }
 
 function sameMagnification(a, b) {
@@ -656,7 +707,8 @@ function equivalentOptionLabel(candidate) {
   }
 
   const digits = candidate.workingDistanceMm < 10 ? 2 : 1;
-  return `${candidate.label} — WD ${formatMm(candidate.workingDistanceMm, digits)}`;
+  const prefix = MACRO_ACCESSORIES_DATA[elements.accessory.value]?.type === 'diopter' ? '≈' : '';
+  return `${candidate.label} — WD ${prefix}${formatMm(candidate.workingDistanceMm, digits)}`;
 }
 
 function renderEquivalentPicker(candidates, target) {

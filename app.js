@@ -129,10 +129,20 @@ function populateLenses(preferredId) {
   elements.lens.value = ids.includes(preferredId) ? preferredId : ids[0] ?? '';
 }
 
+function accessorySortValue(accessory) {
+  if (accessory.type === 'diopter') return Number(accessory.power) || 0;
+  if (accessory.type === 'tube') return Number(accessory.length) || 0;
+  return 0;
+}
+
 function populateAccessories() {
   const order = { none: 0, tube: 1, diopter: 2, reversal: 3 };
   const entries = Object.entries(MACRO_ACCESSORIES_DATA)
-    .sort(([, a], [, b]) => (order[a.type] ?? 9) - (order[b.type] ?? 9) || (a.length ?? 0) - (b.length ?? 0));
+    .sort(([, a], [, b]) => (
+      (order[a.type] ?? 9) - (order[b.type] ?? 9)
+      || accessorySortValue(a) - accessorySortValue(b)
+      || a.name.localeCompare(b.name)
+    ));
   elements.accessory.replaceChildren(...entries.map(([id, data]) => option(id, data.name)));
 }
 

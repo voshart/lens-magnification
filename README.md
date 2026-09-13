@@ -52,7 +52,7 @@ Raster assets can use the same SVG wrapper via an `<image>` element. Crop the so
 
 ## Accuracy
 
-Results are planning estimates rather than measurements of a physical setup. Some calculations use thin-lens approximations, nominal focal lengths, published manufacturer specifications, or assumed pupil magnification. Close-up-lens power is modeled independently of optical quality; aberrations, multi-element correction, spacing, and host-lens interactions are not simulated. For documented close-up products, manufacturer construction and working-distance guidance are shown as reference metadata rather than treated as calculated performance. The interface displays additional warnings when a value is unavailable or especially uncertain.
+Results are planning estimates rather than measurements of a physical setup. Some calculations use thin-lens approximations, nominal focal lengths, published manufacturer specifications, or assumed pupil magnification. Close-up-lens power is modeled independently of optical quality; aberrations, multi-element correction, spacing, and host-lens interactions are not simulated. Generic close-up presets represent nominal optical power only, with construction, correction, coatings, power tolerance, image quality, and actual working distance treated as unknown. For documented Raynox and NiSi products, manufacturer construction and working-distance guidance are shown as reference metadata rather than treated as calculated performance. The interface displays additional warnings when a value is unavailable or especially uncertain.
 
 ## Deployment
 

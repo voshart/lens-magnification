@@ -35,6 +35,7 @@ Then open <http://localhost:8000>.
 - `app.js` — interface state, rendering, and interactions
 - `optics.js` — optical calculations
 - `data.js` — camera, lens, objective, accessory, and reference-object data
+- `closeup-reference-data.js` — reference-only manufacturer focus/distance metadata retained for a possible future focus-range model; not imported by the current app
 
 ## Preview coordinate system
 
@@ -56,11 +57,11 @@ Named close-up-lens presets are included only when first-party technical documen
 
 A missing specification is not treated as proof that a product is poor quality or that a manufacturer is concealing something; it simply means the product is not documented well enough for a brand-specific simulator preset. Users can still approximate an undocumented or unbranded close-up lens with a generic power-only entry when an advertised diopter value is known.
 
-Manufacturer image-quality claims and working-distance ranges are provenance only. The simulator does not convert them into an image-quality score or assume that two products with equal nominal diopter power have identical aberrations or physical working distance.
+Manufacturer image-quality claims and distance ranges are provenance only. The current simulator is centered on each setup's maximum-magnification configuration rather than the full focusing range. Published infinity-focus distances, manufacturer working-distance ranges, focus conditions, and the exact distance terminology used by each manufacturer are preserved in `closeup-reference-data.js` for possible future use, but are not treated as the current setup's working distance.
 
 ## Accuracy
 
-Results are planning estimates rather than measurements of a physical setup. Some calculations use thin-lens approximations, nominal focal lengths, published manufacturer specifications, or assumed pupil magnification. Close-up-lens power is modeled independently of optical quality; aberrations, multi-element correction, spacing, and host-lens interactions are not simulated. Generic close-up presets represent nominal optical power only, with construction, correction, coatings, power tolerance, image quality, and actual working distance treated as unknown. For documented close-up products, manufacturer construction and working-distance guidance are shown as reference metadata rather than treated as calculated performance. The interface displays additional warnings when a value is unavailable or especially uncertain.
+Results are planning estimates rather than measurements of a physical setup. Some calculations use thin-lens approximations, nominal focal lengths, published manufacturer specifications, or assumed pupil magnification. Close-up-lens power is modeled independently of optical quality; aberrations, multi-element correction, spacing, and host-lens interactions are not simulated. Generic close-up presets represent nominal optical power only, with construction, correction, coatings, power tolerance, image quality, and actual working distance treated as unknown. For documented close-up products, manufacturer construction and distance guidance are retained as reference metadata rather than treated as calculated performance. The interface displays additional warnings when a value is unavailable or especially uncertain.
 
 ## Deployment
 

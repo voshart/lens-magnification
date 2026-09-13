@@ -135,13 +135,21 @@ function accessorySortValue(accessory) {
   return 0;
 }
 
+function accessoryDisplayName(accessory) {
+  const name = accessory?.name ?? '';
+  if (accessory?.type !== 'diopter') return name;
+  return name
+    .replace(/\s+Close-Up Lens\b/gi, '')
+    .replace(/\s+Close-Up\b/gi, '');
+}
+
 function populateAccessories() {
   const order = { none: 0, tube: 1, diopter: 2, reversal: 3 };
   const entries = Object.entries(MACRO_ACCESSORIES_DATA)
     .sort(([, a], [, b]) => (
       (order[a.type] ?? 9) - (order[b.type] ?? 9)
       || accessorySortValue(a) - accessorySortValue(b)
-      || a.name.localeCompare(b.name)
+      || accessoryDisplayName(a).localeCompare(accessoryDisplayName(b))
     ));
 
   const tubeGroup = document.createElement('optgroup');
@@ -162,7 +170,7 @@ function populateAccessories() {
       : data.type === 'diopter'
         ? closeUpGroup
         : otherGroup;
-    group.append(option(id, data.name));
+    group.append(option(id, accessoryDisplayName(data)));
   }
 
   elements.accessory.replaceChildren(noneOption);
@@ -445,7 +453,7 @@ function renderRig(system, lensOrObjective, accessory, result) {
       : `${isCloseUp ? 'WD ≈' : 'WD '}${formatMm(wd, 0)}`;
     blocks = [
       { label: wdLabel, value: wd ?? Math.max(lensLength * 0.8, 30), type: 'space', uncertain: wd == null || isCloseUp },
-      ...(isCloseUp ? [{ label: Number.isFinite(power) ? `close-up +${power} D` : 'close-up lens', value: 1, type: 'block' }] : []),
+      ...(isCloseUp ? [{ label: Number.isFinite(power) ? `+${power} D` : 'diopter', value: 1, type: 'block' }] : []),
       { label: 'lens', value: lensLength, type: 'block', uncertain: !lensOrObjective.PL },
       ...(extension > 0 ? [{ label: `${extension} mm`, value: extension, type: 'block' }] : []),
       { label: `${flange} mm`, value: flange, type: 'block' }
@@ -676,7 +684,7 @@ function selectedSetupLabel(objective, lens) {
   if (objective) return name;
 
   const accessory = MACRO_ACCESSORIES_DATA[elements.accessory.value] ?? MACRO_ACCESSORIES_DATA.none;
-  return accessory.type === 'none' ? name : `${name} + ${accessory.name}`;
+  return accessory.type === 'none' ? name : `${name} + ${accessoryDisplayName(accessory)}`;
 }
 
 function sameMagnification(a, b) {

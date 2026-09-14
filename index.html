@@ -21,6 +21,7 @@
   <title>Macrophotography Simulator</title>
   <link rel="canonical" href="https://macro.voshart.com/">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="reference-subjects.css">
 </head>
 <body>
   <main class="shell">
@@ -76,6 +77,47 @@
             <rect id="sensor-border" x="0" y="0" width="36" height="24" class="sensor-border"></rect>
           </svg>
         </div>
+
+        <div class="reference-subject-controls">
+          <label class="field">
+            <span>Reference subject</span>
+            <select id="reference-subject" name="reference-subject">
+              <option value="rice">Rice grain</option>
+              <option value="ladybug">7-spot ladybug</option>
+              <option value="custom">Custom SVG…</option>
+            </select>
+          </label>
+
+          <div class="custom-reference-panel" id="custom-reference-panel" hidden>
+            <div class="custom-reference-source">
+              <label class="custom-reference-file">
+                <span>Upload SVG</span>
+                <input id="custom-reference-file" type="file" accept=".svg,image/svg+xml">
+              </label>
+              <textarea id="custom-reference-svg" spellcheck="false" aria-label="Paste SVG markup" placeholder="Or paste &lt;svg&gt;…&lt;/svg&gt; here"></textarea>
+            </div>
+
+            <div class="custom-reference-scale">
+              <p class="custom-reference-help">Scale the detected artwork bounding box to a real-world width or height.</p>
+              <div class="custom-reference-scale-row">
+                <select id="custom-reference-axis" aria-label="Calibration axis">
+                  <option value="width">Width</option>
+                  <option value="height">Height</option>
+                </select>
+                <input id="custom-reference-size" type="number" min="0.001" step="0.01" value="6" inputmode="decimal" aria-label="Real-world size">
+                <select id="custom-reference-unit" aria-label="Real-world unit">
+                  <option value="mm">mm</option>
+                  <option value="um">µm</option>
+                  <option value="cm">cm</option>
+                </select>
+              </div>
+              <button id="custom-reference-apply" type="button">Apply SVG</button>
+              <p class="custom-reference-bounds" id="custom-reference-bounds">Detected artwork: —</p>
+              <p class="custom-reference-status" id="custom-reference-status" role="status" aria-live="polite"></p>
+            </div>
+          </div>
+        </div>
+
         <section class="magnification-picker" aria-labelledby="magnification-picker-label">
           <div class="magnification-picker-heading">
             <label id="magnification-picker-label" for="magnification-slider">Selected magnification</label>
@@ -138,5 +180,6 @@
   </main>
 
   <script type="module" src="app.js"></script>
+  <script type="module" src="reference-subjects.js"></script>
 </body>
 </html>

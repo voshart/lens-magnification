@@ -69,7 +69,6 @@ function referenceAnchor() {
 
 function setSvgHref(element, href) {
   element.setAttribute('href', href);
-  element.setAttributeNS('http://www.w3.org/1999/xlink', 'href', href);
 }
 
 function appendImageSubject(subject, magnification, anchor) {
@@ -205,6 +204,9 @@ function sanitizeSvg(svgText) {
   if (!text) throw new Error('Paste or upload an SVG first.');
   if (new Blob([text]).size > MAX_CUSTOM_SVG_BYTES) {
     throw new Error('SVG is too large. Keep custom SVGs under 250 KB.');
+  }
+  if (/<!doctype|<!entity/i.test(text)) {
+    throw new Error('SVG document types and entities are not supported.');
   }
 
   const doc = new DOMParser().parseFromString(text, 'image/svg+xml');

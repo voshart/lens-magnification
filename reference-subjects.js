@@ -71,6 +71,15 @@ function setSvgHref(element, href) {
   element.setAttribute('href', href);
 }
 
+function insertSubjectAtRiceLayer(subjectElement) {
+  const rice = elements.objectLayer.querySelector('.preview-rice');
+  if (rice) {
+    rice.before(subjectElement);
+  } else {
+    elements.objectLayer.append(subjectElement);
+  }
+}
+
 function appendImageSubject(subject, magnification, anchor) {
   const image = document.createElementNS(SVG_NS, 'image');
   const width = subject.widthMm * magnification;
@@ -83,7 +92,7 @@ function appendImageSubject(subject, magnification, anchor) {
   image.setAttribute('preserveAspectRatio', 'xMidYMid meet');
   image.setAttribute('aria-hidden', 'true');
   setSvgHref(image, subject.imageHref);
-  elements.objectLayer.append(image);
+  insertSubjectAtRiceLayer(image);
 }
 
 function appendCustomSubject(subject, magnification, anchor) {
@@ -110,7 +119,7 @@ function appendCustomSubject(subject, magnification, anchor) {
   for (const child of [...parsed.documentElement.childNodes]) {
     svg.append(document.importNode(child, true));
   }
-  elements.objectLayer.append(svg);
+  insertSubjectAtRiceLayer(svg);
 }
 
 function isReferenceLegendPart(part) {

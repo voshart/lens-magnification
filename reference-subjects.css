@@ -3,7 +3,7 @@
   grid-template-columns: minmax(180px, 260px) minmax(0, 1fr);
   gap: 10px 14px;
   align-items: end;
-  margin-top: 10px;
+  margin-top: 8px;
 }
 
 .reference-subject-controls .field {
@@ -13,11 +13,16 @@
 .custom-reference-panel {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(220px, 0.8fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px 14px;
   padding: 12px;
   border: 1px solid var(--rule);
   background: var(--paper);
+}
+
+.custom-reference-source,
+.custom-reference-scale {
+  min-width: 0;
 }
 
 .custom-reference-source {
@@ -63,7 +68,7 @@
 
 .custom-reference-scale-row {
   display: grid;
-  grid-template-columns: minmax(90px, 1fr) minmax(80px, 0.7fr) 72px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr) minmax(64px, 0.7fr);
   gap: 6px;
 }
 

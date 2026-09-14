@@ -1,0 +1,125 @@
+.reference-subject-controls {
+  display: grid;
+  grid-template-columns: minmax(180px, 260px) minmax(0, 1fr);
+  gap: 10px 14px;
+  align-items: end;
+  margin-top: 8px;
+}
+
+.reference-subject-controls .field {
+  max-width: 260px;
+}
+
+.custom-reference-panel {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+  padding: 12px;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+}
+
+.custom-reference-source,
+.custom-reference-scale {
+  min-width: 0;
+}
+
+.custom-reference-source {
+  display: grid;
+  gap: 7px;
+}
+
+.custom-reference-source textarea {
+  min-height: 112px;
+  resize: vertical;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 8px 9px;
+  color: var(--ink);
+  background: var(--paper);
+  font: 0.78rem/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.custom-reference-source textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+  outline: none;
+}
+
+.custom-reference-file {
+  display: grid;
+  gap: 4px;
+  color: var(--ink-2);
+  font-size: 0.72rem;
+}
+
+.custom-reference-file input[type='file'] {
+  height: auto;
+  padding: 6px 8px;
+  font-size: 0.8rem;
+}
+
+.custom-reference-scale {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.custom-reference-scale-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr) minmax(64px, 0.7fr);
+  gap: 6px;
+}
+
+.custom-reference-scale button {
+  min-height: 36px;
+  border: 1px solid var(--ink);
+  border-radius: 2px;
+  padding: 0 12px;
+  color: var(--paper);
+  background: var(--ink);
+  cursor: pointer;
+}
+
+.custom-reference-scale button:hover {
+  opacity: 0.88;
+}
+
+.custom-reference-help,
+.custom-reference-bounds,
+.custom-reference-status {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 0.75rem;
+}
+
+.custom-reference-status {
+  min-height: 1.35em;
+}
+
+.custom-svg-measurement {
+  position: absolute;
+  left: -100000px;
+  top: -100000px;
+  width: 1000px;
+  height: 1000px;
+  overflow: visible;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+@media (max-width: 720px) {
+  .reference-subject-controls,
+  .custom-reference-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .custom-reference-panel {
+    grid-column: 1;
+  }
+
+  .reference-subject-controls .field {
+    max-width: none;
+  }
+}

@@ -163,7 +163,6 @@ input:focus {
 .sensor-bg { fill: var(--paper-2); }
 .sensor-border { fill: none; stroke: var(--ink); stroke-width: 0.12; vector-effect: non-scaling-stroke; }
 .object-outline { stroke-width: 0.14; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
-.preview-banana { fill: #ffdb58; stroke: #d1b000; }
 .preview-quarter { fill: #9ca3af; stroke: #4b5563; }
 .preview-rice { fill: #f5f5dc; stroke: #a16207; }
 .preview-target { fill: #808080; stroke: #4b5563; }

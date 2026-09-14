@@ -71,6 +71,9 @@ let megapixelsUserSet = false;
 let requestedMagnification = null;
 let equivalentPreference = null;
 
+const QUARTER_ARTWORK_HREF = './Coin-Face_low-contrast-grey-circle.svg';
+const BANANA_ARTWORK_HREF = './banana-optimized-5kb.svg';
+
 function option(value, label) {
   const el = document.createElement('option');
   el.value = value;
@@ -272,50 +275,59 @@ function referenceObjectAnchor(system) {
  * - Projected size on the sensor is subject size × optical magnification.
  *
  * Keeping source artwork inside a nested SVG isolates its arbitrary vector or
- * raster coordinates from the sensor coordinate system. A future raster subject
- * can pass imageHref instead of vectorMarkup, provided the source file is tightly
- * cropped, artworkViewBox is [0, 0, pixelWidth, pixelHeight], and lengthMm
- * describes the crop's horizontal specimen length.
+ * raster coordinates from the sensor coordinate system. An image subject can
+ * provide imageViewBox for its full source canvas and artworkViewBox for the crop
+ * representing lengthMm.
  */
 function referenceArtworkMarkup({ subject, system, magnification, vectorMarkup = '', imageHref = null }) {
   const [sourceX, sourceY, sourceWidth, sourceHeight] = subject.artworkViewBox ?? [];
   if (![sourceX, sourceY, sourceWidth, sourceHeight].every(Number.isFinite)) return '';
   if (sourceWidth <= 0 || sourceHeight <= 0 || !Number.isFinite(subject.lengthMm)) return '';
 
-  const projectedWidth = subject.lengthMm * magnification;
-  const projectedHeight = projectedWidth * sourceHeight / sourceWidth;
+  const artworkLengthUnits = subject.artworkLengthUnits ?? sourceWidth;
+  if (!Number.isFinite(artworkLengthUnits) || artworkLengthUnits <= 0) return '';
+  const artworkScale = subject.lengthMm * magnification / artworkLengthUnits;
+  const projectedWidth = sourceWidth * artworkScale;
+  const projectedHeight = sourceHeight * artworkScale;
   const anchor = referenceObjectAnchor(system);
   const x = anchor.x - projectedWidth / 2;
   const y = anchor.y - projectedHeight / 2;
-  const content = imageHref
-    ? `<image href="${svgEscape(imageHref)}" x="${sourceX}" y="${sourceY}" width="${sourceWidth}" height="${sourceHeight}" preserveAspectRatio="none"></image>`
-    : vectorMarkup;
+  let content = vectorMarkup;
+  if (imageHref) {
+    const [imageX, imageY, imageWidth, imageHeight] = subject.imageViewBox ?? subject.artworkViewBox;
+    content = `<image href="${svgEscape(imageHref)}" x="${imageX}" y="${imageY}" width="${imageWidth}" height="${imageHeight}" preserveAspectRatio="none"></image>`;
+  }
 
   return `
-    <svg x="${x}" y="${y}" width="${projectedWidth}" height="${projectedHeight}" viewBox="${sourceX} ${sourceY} ${sourceWidth} ${sourceHeight}" preserveAspectRatio="xMidYMid meet" overflow="visible" aria-hidden="true">
+    <svg x="${x}" y="${y}" width="${projectedWidth}" height="${projectedHeight}" viewBox="${sourceX} ${sourceY} ${sourceWidth} ${sourceHeight}" preserveAspectRatio="xMidYMid meet" overflow="${imageHref ? 'hidden' : 'visible'}" aria-hidden="true">
       ${content}
     </svg>`;
 }
 
+function quarterArtworkMarkup(system, magnification) {
+  const size = REFERENCE_OBJECTS.quarter.diameterMm * magnification;
+  const anchor = referenceObjectAnchor(system);
+
+  return `<image class="preview-quarter" href="${QUARTER_ARTWORK_HREF}" x="${anchor.x - size / 2}" y="${anchor.y - size / 2}" width="${size}" height="${size}" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></image>`;
+}
+
 function drawCameraObjects(system, result) {
   const m = result.magnification;
-  const { banana, quarter, rice } = REFERENCE_OBJECTS;
-  const cx = system.sensorWidth / 2;
-  const cy = system.sensorHeight / 2;
+  const { banana, rice } = REFERENCE_OBJECTS;
 
-  const quarterR = quarter.diameterMm * m / 2;
   const riceW = rice.widthMm * m;
   const riceH = rice.lengthMm * m;
   const riceAnchor = referenceObjectAnchor(system);
+  const quarterMarkup = quarterArtworkMarkup(system, m);
   const bananaMarkup = referenceArtworkMarkup({
     subject: banana,
     system,
     magnification: m,
-    vectorMarkup: '<path class="preview-banana object-outline" d="M 36 0 C 38 0 44 0 47 4 C 56 13 61 25 66 43 C 72 66 76 92 91 111 C 130 159 193 201 242 230 C 283 254 344 264 402 259 C 463 254 527 233 584 205 C 630 182 677 156 708 133 C 723 122 727 108 741 108 C 751 108 763 119 767 131 C 771 142 763 151 756 161 C 746 176 743 202 733 231 C 719 274 693 311 659 341 C 615 380 562 405 504 418 C 438 433 360 434 293 424 C 233 415 179 393 133 361 C 85 328 48 293 35 253 C 24 218 28 181 32 146 C 37 109 27 85 17 64 C 8 47 -2 33 3 25 C 10 15 24 6 36 0 Z"></path>'
+    imageHref: BANANA_ARTWORK_HREF
   });
 
   elements.objectLayer.innerHTML = `
-    <circle class="preview-quarter object-outline" cx="${cx}" cy="${cy}" r="${quarterR}"></circle>
+    ${quarterMarkup}
     ${bananaMarkup}
     <ellipse class="preview-rice object-outline" cx="${riceAnchor.x}" cy="${riceAnchor.y}" rx="${riceW / 2}" ry="${riceH / 2}" transform="rotate(12 ${riceAnchor.x} ${riceAnchor.y})"></ellipse>
   `;
@@ -325,15 +337,15 @@ function drawCameraObjects(system, result) {
 
 function drawObjectiveObjects(system, result) {
   const m = result.magnification;
-  const { quarter, target, tardigrade, rice } = REFERENCE_OBJECTS;
+  const { target, tardigrade, rice } = REFERENCE_OBJECTS;
   const cx = system.sensorWidth / 2;
   const cy = system.sensorHeight / 2;
-  const quarterR = quarter.diameterMm * m / 2;
   const targetSize = target.sizeMm * m;
   const riceW = rice.widthMm * m;
   const riceH = rice.lengthMm * m;
   const riceAnchor = referenceObjectAnchor(system);
   const showTardigrade = m >= 10;
+  const quarterMarkup = quarterArtworkMarkup(system, m);
   const targetMarkup = showTardigrade ? '' : `
     <rect class="preview-target object-outline" x="${cx - targetSize / 2}" y="${cy - targetSize / 2}" width="${targetSize}" height="${targetSize}"></rect>`;
   const tardigradeMarkup = showTardigrade ? referenceArtworkMarkup({
@@ -355,7 +367,7 @@ function drawObjectiveObjects(system, result) {
   }) : '';
 
   elements.objectLayer.innerHTML = `
-    <circle class="preview-quarter object-outline" cx="${cx}" cy="${cy}" r="${quarterR}"></circle>
+    ${quarterMarkup}
     ${targetMarkup}
     <ellipse class="preview-rice object-outline" cx="${riceAnchor.x}" cy="${riceAnchor.y}" rx="${riceW / 2}" ry="${riceH / 2}" transform="rotate(12 ${riceAnchor.x} ${riceAnchor.y})"></ellipse>
     ${tardigradeMarkup}

@@ -84,8 +84,11 @@ export const REFERENCE_OBJECTS = {
   banana: {
     name: 'banana',
     lengthMm: 180,
-    // Tight geometric bounds of the embedded vector path.
-    artworkViewBox: [1.664, 0, 766.406, 430.56]
+    // Browser-measured artwork bounds are x=144..2641 and y=61..1474.
+    // Retain 12 source units of transparent padding around those bounds.
+    artworkViewBox: [132, 49, 2521, 1437],
+    artworkLengthUnits: 2497,
+    imageViewBox: [0, 0, 2770, 1536]
   },
   quarter: { name: 'US quarter', diameterMm: 24.26 },
   rice: { name: 'rice grain', lengthMm: 6, widthMm: 1.5 },

@@ -74,6 +74,7 @@
             <rect id="sensor-bg" x="0" y="0" width="36" height="24" class="sensor-bg"></rect>
             <g id="object-layer" clip-path="url(#sensor-clip)"></g>
             <g id="image-circle-layer" clip-path="url(#sensor-clip)"></g>
+            <g id="pixel-crop-layer" clip-path="url(#sensor-clip)" aria-hidden="true"></g>
             <rect id="sensor-border" x="0" y="0" width="36" height="24" class="sensor-border"></rect>
           </svg>
         </div>
@@ -108,6 +109,32 @@
               <option value="custom">Custom SVG…</option>
             </select>
           </label>
+
+          <label class="field">
+            <span>Pixel crop overlay</span>
+            <select id="pixel-crop" name="pixel-crop" aria-describedby="pixel-crop-info pixel-crop-warning">
+              <option value="off" selected>Off</option>
+              <optgroup label="Square crops">
+                <option value="500x500">500 × 500 px</option>
+                <option value="1000x1000">1,000 × 1,000 px</option>
+                <option value="1080x1080">1,080 × 1,080 px</option>
+                <option value="2000x2000">2,000 × 2,000 px</option>
+                <option value="3000x3000">3,000 × 3,000 px</option>
+              </optgroup>
+              <optgroup label="Portrait crops">
+                <option value="1080x1350">1,080 × 1,350 px · 4:5</option>
+                <option value="1080x1920">1,080 × 1,920 px · 9:16</option>
+                <option value="2400x3000">2,400 × 3,000 px · 4:5</option>
+              </optgroup>
+              <optgroup label="Landscape crops">
+                <option value="1920x1080">1,920 × 1,080 px · 16:9</option>
+                <option value="3000x2000">3,000 × 2,000 px · 3:2</option>
+                <option value="3840x2160">3,840 × 2,160 px · 16:9</option>
+              </optgroup>
+            </select>
+          </label>
+          <p class="pixel-crop-info" id="pixel-crop-info" role="status" hidden></p>
+          <p class="pixel-crop-info pixel-crop-warning" id="pixel-crop-warning" role="status" hidden></p>
 
           <div class="custom-reference-panel" id="custom-reference-panel" hidden>
             <div class="custom-reference-source">
@@ -172,6 +199,7 @@
           <div><dt>Airy diameter</dt><dd id="out-airy-px">—</dd></div>
           <div><dt>Airy diameter at subject</dt><dd id="out-subject-airy">—</dd></div>
           <div><dt>Sensor Nyquist</dt><dd id="out-nyquist">—</dd></div>
+          <div><dt>Ideal diffraction contrast <small>(4 px cycle)</small></dt><dd id="out-diffraction-contrast">—</dd></div>
           <div id="image-circle-result" hidden><dt>Objective image circle</dt><dd id="out-image-circle">—</dd></div>
         </dl>
         <div class="notes" id="notes"></div>

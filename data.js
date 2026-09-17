@@ -1,5 +1,6 @@
 // Optical data migrated from the prototype and corrected against manufacturer/catalog sources.
-const lensMap=(rows)=>Object.fromEntries(rows.map(([id,name,f,NM,PL,MFD,rev,maxMFD,wd,accessoryModel])=>{const v={name,f,NM,PL,MFD,reversedMagEstimateManual:rev};if(maxMFD)v.maxMagnificationMFD=maxMFD;if(wd)v.nativeWorkingDistanceMm=wd;if(accessoryModel===false)v.accessoryModel=false;return[id,v]}));
+const widestApertureFromName=(name)=>{const match=String(name).match(/\bF\/?(\d+(?:\.\d+)?)/i);return match?Number(match[1]):null};
+const lensMap=(rows)=>Object.fromEntries(rows.map(([id,name,f,NM,PL,MFD,rev,maxMFD,wd,accessoryModel])=>{const v={id,name,f,NM,PL,MFD,reversedMagEstimateManual:rev,widestAperture:widestApertureFromName(name)};if(maxMFD)v.maxMagnificationMFD=maxMFD;if(wd)v.nativeWorkingDistanceMm=wd;if(accessoryModel===false)v.accessoryModel=false;return[id,v]}));
 const system=(systemName,flangeDistance,sensorWidth,sensorHeight,typicalMegapixels,rows)=>({systemName,flangeDistance,sensorWidth,sensorHeight,typicalMegapixels,lenses:lensMap(rows)});
 export const LENSES_BY_SYSTEM={
 "sony_e_ff":system("Sony E (Full Frame)",18,36,24,45,[["laowa_25mm_f2_8_2_5x","Laowa 25mm f/2.8 2.5–5× Ultra Macro (at 2.5×)",25,2.5,82,234,null,null,45,false],["laowa_25mm_f2_8_5x","Laowa 25mm f/2.8 2.5–5× Ultra Macro (at 5×)",25,5,82,173,null,null,40,false],["sony_fe_100mm_f2_8_macro_gm_oss","Sony FE 100mm f/2.8 Macro GM OSS",100,1.4,147.9,260,null],["sony_fe_90mm_f2_8_macro_g_oss","Sony FE 90mm f/2.8 Macro G OSS",90,1,130.5,280,"~0.6:1"],["sigma_70mm_f2_8_dg_macro_art_se","Sigma 70mm f/2.8 DG Macro Art (Sony E)",70,1,131.8,258,"~0.8:1"],["sigma_105mm_f2_8_dg_dn_macro_art_se","Sigma 105mm F2.8 DG DN Macro Art (Sony E)",105,1,135.6,295,"~0.5:1"],["laowa_100mm_f2_8_2x_macro_sony_fe","Laowa 100mm f/2.8 2x Ultra Macro APO (Sony FE)",100,2,155,247,"~0.5:1"],["sony_fe_50mm_f2_8_macro","Sony FE 50mm f/2.8 Macro",50,1,71,160,"~1.1:1"],["sony_fe_20mm_f1_8_g_ext_poc","Sony FE 20mm f/1.8 G",20,0.2,84.7,190,"~3.2:1"],["sony_fe_40mm_f2_5_g_ext_poc","Sony FE 40mm f/2.5 G",40,0.23,45,250,"~1.5:1"],["sony_fe_55mm_f1_8_za","Sony Sonnar T* FE 55mm f/1.8 ZA",55,0.14,70.5,500,"~1.0:1"],["sony_fe_28mm_f2","Sony FE 28mm f/2",28,0.16,60,250,"~2.4:1"],["sony_fe_12_24mm_f4_g","Sony FE 12-24mm f/4 G",12,0.14,117.4,280,"~4.5:1 (at 12mm), ~2.0:1 (at 24mm)",280]]),
@@ -12,6 +13,20 @@ export const LENSES_BY_SYSTEM={
 "canon_ef_apsc":system("Canon EF-S (APS-C DSLR)",44,22.3,14.9,24,[["canon_efs_18_55mm_f3_5_5_6_is_stm","Canon EF-S 18-55mm f/3.5-5.6 IS STM",18,0.36,75.2,250,"~3.5:1 (at 18mm), ~0.9:1 (at 55mm)",250]]),
 "vintage_lens_ff_adaptable":system("Nikon F lens (full-frame sensor)",46.5,36,24,24,[["nikon_nikkor_28mm_f2_8_ais","Nikon Nikkor 28mm f/2.8 AIS",28,0.256,null,200,"~2.5:1"]]),
 };
+
+// Laowa's Aksen lenses are variable-magnification, focus-by-rail optics. As with
+// the existing Laowa 2.5–5× preset, the endpoints are separate choices so the
+// preview and closest-magnification picker can represent both ends faithfully.
+const AKSEN_LENSES={
+  "laowa_aksen_45mm_f2_8_1x":{"id":"laowa_aksen_45mm_f2_8_1x","name":"Laowa Aksen 45mm f/2.8 1–5× Ultra Macro APO (at 1×)","f":45,"NM":1,"PL":null,"MFD":null,"widestAperture":2.8,"narrowestAperture":11,"accessoryModel":false},
+  "laowa_aksen_45mm_f2_8_5x":{"id":"laowa_aksen_45mm_f2_8_5x","name":"Laowa Aksen 45mm f/2.8 1–5× Ultra Macro APO (at 5×)","f":45,"NM":5,"PL":null,"MFD":null,"widestAperture":2.8,"narrowestAperture":11,"nativeWorkingDistanceMm":40.35,"accessoryModel":false},
+  "laowa_aksen_17_5mm_f1_7_5x":{"id":"laowa_aksen_17_5mm_f1_7_5x","name":"Laowa Aksen 17.5mm f/1.7 5–10× Ultra Macro APO (at 5×)","f":17.5,"NM":5,"PL":null,"MFD":null,"widestAperture":1.7,"narrowestAperture":5.6,"accessoryModel":false},
+  "laowa_aksen_17_5mm_f1_7_10x":{"id":"laowa_aksen_17_5mm_f1_7_10x","name":"Laowa Aksen 17.5mm f/1.7 5–10× Ultra Macro APO (at 10×)","f":17.5,"NM":10,"PL":null,"MFD":null,"widestAperture":1.7,"narrowestAperture":5.6,"nativeWorkingDistanceMm":22.48,"accessoryModel":false}
+};
+for(const systemId of ["sony_e_ff","nikon_z_ff","canon_rf_ff","m43"]){
+  Object.assign(LENSES_BY_SYSTEM[systemId].lenses,AKSEN_LENSES);
+}
+LENSES_BY_SYSTEM.m43.lenses.om_system_mzuiko_90mm_f3_5_macro_is_pro.narrowestAperture=22;
 
 // Full-frame lenses on the same mirrorless mount remain physically compatible
 // with APS-C bodies. Reproduction ratio is unchanged; the smaller sensor only
@@ -44,6 +59,21 @@ export const ACCESSORY_CATALOG={
   "reversal_mount":{"label":"Legacy prototype estimate","url":null,"note":"Reversed-lens magnifications are inherited empirical estimates from the original prototype and have not been independently verified lens-by-lens."}
 };
 export const MACRO_ACCESSORIES_DATA=Object.fromEntries([["none","No Accessory",0,"none",null,null],["et10mm","10mm Extension Tube",10,"tube",null,null],["et12mm","12mm Extension Tube",12,"tube",null,null],["et16mm","16mm Extension Tube",16,"tube",null,null],["et20mm","20mm Extension Tube",20,"tube",null,null],["et25mm","25mm Extension Tube",25,"tube",null,null],["et36mm","36mm Extension Tube",36,"tube",null,null],["et48mm","48mm (12+36)",48,"tube",null,null],["et52mm","52mm (16+36)",52,"tube",null,null],["et56mm","56mm (20+36)",56,"tube",null,null],["et68mm","68mm (12+20+36)",68,"tube",null,null],["et72mm","72mm (36x2)",72,"tube",null,null],["reversal_mount","Lens Reversal Mount",8,"reversal",null,"Magnification highly variable. Uses estimate if available."],["diopter_5","Generic Close-Up Lens (+5 D)",0,"diopter",5,"Nominal power only; optical quality and working distance are unknown."],["nisi_closeup_58_plus5","NiSi 58mm Close-Up Lens (+5 D)",0,"diopter",5,"Sourced APO corrective design; optical quality is not simulated."],["diopter_8","Generic Close-Up Lens (+8 D)",0,"diopter",8,"Nominal power only; optical quality and working distance are unknown."],["raynox_dcr_250","Raynox DCR-250 (+8 D)",0,"diopter",8,"Sourced 2-group/3-element coated optical-glass design; optical quality is not simulated."],["diopter_9","Generic Close-Up Lens (+9 D)",0,"diopter",9,"Nominal power only; optical quality and working distance are unknown."],["nisi_closeup_49_plus9","NiSi 49mm Close-Up Lens (+9 D)",0,"diopter",9,"Sourced three-element APO design; optical quality is not simulated."]].map(([id,name,length,type,power,effect_note])=>[id,{name,length,type,...(power?{power}:{}),...(effect_note?{effect_note}:{})}]));
+Object.assign(MACRO_ACCESSORIES_DATA,{
+  "om_mc_14":{name:"OM SYSTEM M.Zuiko MC-14 (1.4×)",length:14.7,type:"teleconverter",magnification:1.4,widestAperture:5,narrowestAperture:22,minimumFocusDistanceMm:239,compatibleLensIds:["om_system_mzuiko_90mm_f3_5_macro_is_pro"]},
+  "om_mc_20":{name:"OM SYSTEM M.Zuiko MC-20 (2×)",length:25.9,type:"teleconverter",magnification:2,widestAperture:7.1,narrowestAperture:22,minimumFocusDistanceMm:250,compatibleLensIds:["om_system_mzuiko_90mm_f3_5_macro_is_pro"]}
+});
+const AKSEN_MANUAL_URL="https://www.laowalens.com/Public/Uploads/uploadfile/files/20251203/FF45mmF2.8ULTRAMACRO1-5XAPOyijiFF17.5mmF1.7ULTRAMACRO5-10XAPOxianweijingtouxianweijingshuomingshu.pdf";
+Object.assign(OPTIC_CATALOG,{
+  "laowa_aksen_45mm_f2_8_1x":{"label":"Laowa","url":AKSEN_MANUAL_URL,"note":"Manufacturer manual: full-frame 45 mm f/2.8–11, 1–5×, offered in Nikon Z and other mounts. Working distance is published only as a 40.35 mm minimum, so it is shown only at the 5× endpoint."},
+  "laowa_aksen_45mm_f2_8_5x":{"label":"Laowa","url":AKSEN_MANUAL_URL,"note":"Manufacturer manual: full-frame 45 mm f/2.8–11, 1–5×, with 40.35 mm minimum working distance. Accessory stacking is intentionally not modeled."},
+  "laowa_aksen_17_5mm_f1_7_5x":{"label":"Laowa","url":AKSEN_MANUAL_URL,"note":"Manufacturer manual: full-frame 17.5 mm f/1.7–5.6, 5–10×, offered in Nikon Z and other mounts. Working distance is published only as a 22.48 mm minimum, so it is shown only at the 10× endpoint."},
+  "laowa_aksen_17_5mm_f1_7_10x":{"label":"Laowa","url":AKSEN_MANUAL_URL,"note":"Manufacturer manual: full-frame 17.5 mm f/1.7–5.6, 5–10×, with 22.48 mm minimum working distance. Accessory stacking is intentionally not modeled."}
+});
+Object.assign(ACCESSORY_CATALOG,{
+  "om_mc_14":{"label":"OM SYSTEM","url":"https://explore.omsystem.com/us/en/m-zuiko-digital-1-4x-teleconverter-mc-14","note":"Official 90 mm Macro PRO combination: 2.8× nominal magnification in S-MACRO, f/5–22 composite aperture and 0.239 m closest focus. Compatibility is limited to the 90 mm Macro PRO among lenses currently in this app."},
+  "om_mc_20":{"label":"OM SYSTEM","url":"https://explore.omsystem.com/us/en/m-zuiko-digital-2x-teleconverter-mc-20","note":"Official 90 mm Macro PRO combination: 4× magnification in S-MACRO, f/7.1–22 composite aperture and 0.250 m closest focus. Compatibility is limited to the 90 mm Macro PRO among lenses currently in this app."}
+});
 
 // Named close-up lenses are included only when first-party documentation supports
 // their optical power/focal length and corrected or multi-element construction.

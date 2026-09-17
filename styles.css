@@ -171,6 +171,46 @@ input:focus {
 .image-circle-vignette { fill: url(#image-circle-vignette); }
 .image-circle-line { fill: none; stroke: rgb(255 255 255 / 65%); stroke-width: 0.12; stroke-dasharray: 0.5 0.35; vector-effect: non-scaling-stroke; }
 
+#pixel-crop-layer { pointer-events: none; }
+.pixel-crop-underlay,
+.pixel-crop-outline {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+.pixel-crop-underlay { stroke: rgb(0 0 0 / 65%); stroke-width: 3; }
+.pixel-crop-outline { stroke: white; stroke-width: 1.5; stroke-dasharray: 6 4; }
+.pixel-crop-info {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+}
+.pixel-crop-info.is-warning { color: var(--warning); }
+#pixel-crop-layer.is-warning .pixel-crop-outline { stroke: #ffc04d; }
+.pixel-crop-warning {
+  color: var(--ink);
+  border-left: 3px solid #ffc04d;
+  padding-left: 8px;
+}
+.aperture-suggestion {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  color: var(--accent);
+  background: none;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  cursor: pointer;
+}
+.aperture-suggestion:hover { color: var(--ink); }
+.aperture-suggestion:focus-visible {
+  border-radius: 1px;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .sensor-panel figcaption {
   display: flex;
   justify-content: space-between;

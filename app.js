@@ -7,8 +7,11 @@ import {
   REFERENCE_OBJECTS
 } from './data.js';
 import {
+  DIFFRACTION_WARNING_CONTRAST,
+  apertureLimits,
   calculateCameraSetup,
   calculateObjectiveSetup,
+  suggestedDiffractionCrop,
   closestMagnificationCandidate,
   closestMagnificationCandidates
 } from './optics.js';
@@ -29,6 +32,10 @@ const elements = {
   sensorClipRect: $('sensor-clip-rect'),
   objectLayer: $('object-layer'),
   imageCircleLayer: $('image-circle-layer'),
+  pixelCropLayer: $('pixel-crop-layer'),
+  pixelCrop: $('pixel-crop'),
+  pixelCropInfo: $('pixel-crop-info'),
+  pixelCropWarning: $('pixel-crop-warning'),
   sensorCaption: $('sensor-caption'),
   objectLegend: $('object-legend'),
   rigSvg: $('rig-svg'),
@@ -55,6 +62,7 @@ const elements = {
     airyPx: $('out-airy-px'),
     subjectAiry: $('out-subject-airy'),
     nyquist: $('out-nyquist'),
+    diffractionContrast: $('out-diffraction-contrast'),
     imageCircle: $('out-image-circle')
   }
 };
@@ -147,9 +155,14 @@ function accessoryDisplayName(accessory) {
     .replace(/\s+Close-Up\b/gi, '');
 }
 
-function populateAccessories() {
-  const order = { none: 0, tube: 1, diopter: 2, reversal: 3 };
+function populateAccessories(preferredId = elements.accessory.value) {
+  const lens = currentLens();
+  const order = { none: 0, tube: 1, diopter: 2, teleconverter: 3, reversal: 4 };
   const entries = Object.entries(MACRO_ACCESSORIES_DATA)
+    .filter(([, accessory]) => (
+      !Array.isArray(accessory.compatibleLensIds)
+      || accessory.compatibleLensIds.includes(lens?.id)
+    ))
     .sort(([, a], [, b]) => (
       (order[a.type] ?? 9) - (order[b.type] ?? 9)
       || accessorySortValue(a) - accessorySortValue(b)
@@ -160,6 +173,8 @@ function populateAccessories() {
   tubeGroup.label = 'Extension tubes';
   const closeUpGroup = document.createElement('optgroup');
   closeUpGroup.label = 'Close-up lenses';
+  const teleconverterGroup = document.createElement('optgroup');
+  teleconverterGroup.label = 'Teleconverters';
   const otherGroup = document.createElement('optgroup');
   otherGroup.label = 'Other accessories';
   let noneOption = option('none', MACRO_ACCESSORIES_DATA.none?.name ?? 'No Accessory');
@@ -173,14 +188,37 @@ function populateAccessories() {
       ? tubeGroup
       : data.type === 'diopter'
         ? closeUpGroup
+        : data.type === 'teleconverter'
+          ? teleconverterGroup
         : otherGroup;
     group.append(option(id, accessoryDisplayName(data)));
   }
 
   elements.accessory.replaceChildren(noneOption);
-  for (const group of [tubeGroup, closeUpGroup, otherGroup]) {
+  for (const group of [tubeGroup, closeUpGroup, teleconverterGroup, otherGroup]) {
     if (group.children.length) elements.accessory.append(group);
   }
+  elements.accessory.value = [...elements.accessory.options].some((item) => item.value === preferredId)
+    ? preferredId
+    : 'none';
+}
+
+function syncApertureLimits(lens, accessory, clamp = false) {
+  const limits = apertureLimits(lens, accessory);
+  elements.aperture.min = limits.widest ?? 0.7;
+  elements.aperture.max = limits.narrowest ?? 64;
+  const current = Number(elements.aperture.value);
+  if (clamp && Number.isFinite(current)) {
+    if (limits.widest && current < limits.widest) elements.aperture.value = limits.widest;
+    if (limits.narrowest && current > limits.narrowest) elements.aperture.value = limits.narrowest;
+  }
+  const value = Number(elements.aperture.value);
+  const invalid = Number.isFinite(value) && (
+    (limits.widest && value < limits.widest)
+    || (limits.narrowest && value > limits.narrowest)
+  );
+  if (invalid) elements.aperture.setAttribute('aria-invalid', 'true');
+  else elements.aperture.removeAttribute('aria-invalid');
 }
 
 function setFieldAvailability(field, control, available, unavailableText) {
@@ -207,11 +245,14 @@ function loadStateFromUrl() {
   const accessory = params.get('accessory');
   const aperture = Number(params.get('f'));
   const megapixels = Number(params.get('mp'));
+  const crop = params.get('crop');
+  if ([...elements.pixelCrop.options].some((item) => item.value === crop)) {
+    elements.pixelCrop.value = crop;
+  }
 
   if (system && LENSES_BY_SYSTEM[system]) elements.system.value = system;
   populateLenses(lens || defaultState.lens);
-
-  if (accessory && MACRO_ACCESSORIES_DATA[accessory]) elements.accessory.value = accessory;
+  populateAccessories(accessory || defaultState.accessory);
   if (Number.isFinite(aperture) && aperture > 0) elements.aperture.value = aperture;
   if (Number.isFinite(megapixels) && megapixels > 0) {
     elements.megapixels.value = megapixels;
@@ -232,6 +273,7 @@ function saveStateToUrl() {
 
   const megapixels = Number(elements.megapixels.value);
   if (Number.isFinite(megapixels) && megapixels > 0) params.set('mp', megapixels.toString());
+  if (elements.pixelCrop.value !== 'off') params.set('crop', elements.pixelCrop.value);
 
   history.replaceState(null, '', `${location.pathname}?${params}${location.hash}`);
 }
@@ -251,6 +293,18 @@ function formatFov(fov) {
 function formatMag(value) {
   if (!value) return '—';
   return `${value < 10 ? value.toFixed(2) : value.toFixed(1)}×`;
+}
+
+function formatDiffractionPercent(contrast) {
+  if (!Number.isFinite(contrast) || contrast <= 0) return null;
+  const percent = contrast * 100;
+  return percent < 1 ? 'less than 1%' : `about ${Math.round(percent)}%`;
+}
+
+function formatDiffractionResult(contrast) {
+  if (!Number.isFinite(contrast)) return '—';
+  if (contrast === 0) return 'At/beyond ideal cutoff';
+  return formatDiffractionPercent(contrast);
 }
 
 function setSvgDimensions(width, height) {
@@ -402,10 +456,98 @@ function drawImageCircle(system, result) {
   `;
 }
 
+function drawPixelCrop(system, result) {
+  elements.pixelCropLayer.replaceChildren();
+  elements.pixelCropInfo.hidden = elements.pixelCrop.value === 'off';
+  elements.pixelCropInfo.textContent = '';
+  elements.pixelCropInfo.classList.remove('is-warning');
+  elements.pixelCropLayer.classList.remove('is-warning');
+  elements.pixelCropWarning.hidden = true;
+  elements.pixelCropWarning.textContent = '';
+  if (elements.pixelCrop.value === 'off') return;
+
+  if (!result.valid || !Number.isFinite(result.pixelPitchUm) || result.pixelPitchUm <= 0) {
+    elements.pixelCropInfo.textContent = 'Enter a valid setup and sensor MP to show the pixel crop.';
+    return;
+  }
+
+  const [widthPx, heightPx] = elements.pixelCrop.value.split('x').map(Number);
+  // SVG coordinates are sensor-plane mm; this box counts source pixels,
+  // independently of optical magnification or display size.
+  const widthMm = widthPx * result.pixelPitchUm / 1000;
+  const heightMm = heightPx * result.pixelPitchUm / 1000;
+  if (widthMm > system.sensorWidth || heightMm > system.sensorHeight) {
+    elements.pixelCropInfo.textContent = 'This pixel crop exceeds the sensor dimensions. Choose a smaller preset or check sensor MP.';
+    elements.pixelCropInfo.classList.add('is-warning');
+    return;
+  }
+
+  const x = (system.sensorWidth - widthMm) / 2;
+  const y = (system.sensorHeight - heightMm) / 2;
+  const bounds = `x="${x}" y="${y}" width="${widthMm}" height="${heightMm}"`;
+  elements.pixelCropLayer.innerHTML = `
+    <rect class="pixel-crop-underlay" ${bounds}></rect>
+    <rect class="pixel-crop-outline" ${bounds}></rect>
+  `;
+  const coverage = formatFov({
+    widthMm: widthMm / result.magnification,
+    heightMm: heightMm / result.magnification
+  });
+  elements.pixelCropInfo.textContent = `${widthPx.toLocaleString('en-US')} × ${heightPx.toLocaleString('en-US')} source pixels · ${coverage} at subject · estimated from sensor MP`;
+  if (Number.isFinite(result.diffractionContrast) && result.diffractionContrast < DIFFRACTION_WARNING_CONTRAST) {
+    elements.pixelCropLayer.classList.add('is-warning');
+    elements.pixelCropWarning.hidden = false;
+    elements.pixelCropWarning.append(document.createTextNode('Diffraction may soften fine detail in this crop. '));
+    const suggestedCrop = suggestedDiffractionCrop({
+      effectiveFNumber: result.effectiveFNumber,
+      pitchUm: result.pixelPitchUm,
+      widthPx,
+      heightPx,
+      sensorWidthMm: system.sensorWidth,
+      sensorHeightMm: system.sensorHeight
+    });
+    const outputSize = `${widthPx.toLocaleString('en-US')} × ${heightPx.toLocaleString('en-US')}`;
+    if (suggestedCrop?.fitsSensor) {
+      const sourceSize = `${suggestedCrop.sourceWidthPx.toLocaleString('en-US')} × ${suggestedCrop.sourceHeightPx.toLocaleString('en-US')}`;
+      elements.pixelCropWarning.append(document.createTextNode(`Suggested crop: approximately ${sourceSize} source pixels, then resize to ${outputSize} for export. `));
+    } else if (suggestedCrop) {
+      elements.pixelCropWarning.append(document.createTextNode(`Even the largest crop at this aspect ratio falls short of the diffraction detail guide for a ${outputSize} export. Try a smaller output size. `));
+    }
+
+    const recommendation = result.apertureRecommendation;
+    if (recommendation) {
+      const apertureLabel = Number.isInteger(recommendation.aperture)
+        ? recommendation.aperture.toFixed(0)
+        : recommendation.aperture.toFixed(1);
+      const guidance = recommendation.clearsThreshold
+        ? `Or try f/${apertureLabel} to reduce diffraction with the current crop. `
+        : `Try the widest available f/${apertureLabel} to reduce diffraction; a wider crop may still be needed. `;
+      elements.pixelCropWarning.append(document.createTextNode(guidance));
+      const apply = document.createElement('button');
+      apply.type = 'button';
+      apply.className = 'aperture-suggestion';
+      apply.textContent = `Set f/${apertureLabel}`;
+      apply.addEventListener('click', () => {
+        elements.aperture.value = recommendation.aperture;
+        elements.aperture.focus();
+        render();
+      });
+      elements.pixelCropWarning.append(apply, document.createTextNode(' '));
+    } else if (result.type === 'objective') {
+      elements.pixelCropWarning.append(document.createTextNode('This objective has no adjustable f-stop. '));
+    } else if (result.widestAperture) {
+      elements.pixelCropWarning.append(document.createTextNode(`This setup is already at its widest available f/${result.widestAperture}. `));
+    }
+    const qualification = 'Diffraction estimate only; actual lens sharpness may differ. See calculation notes for assumptions.';
+    elements.pixelCropWarning.append(document.createTextNode(qualification));
+  }
+}
+
 function renderSensor(system, result) {
   setSvgDimensions(system.sensorWidth, system.sensorHeight);
   elements.objectLayer.replaceChildren();
   elements.imageCircleLayer.replaceChildren();
+  drawPixelCrop(system, result);
 
   if (!result.valid) {
     elements.sensorCaption.textContent = result.reason;
@@ -457,7 +599,7 @@ function renderRig(system, lensOrObjective, accessory, result) {
   } else {
     const wd = result.workingDistanceMm;
     const lensLength = lensOrObjective.PL ?? 60;
-    const extension = accessory.type === 'tube' ? (accessory.length ?? 0) : 0;
+    const extension = ['tube', 'teleconverter'].includes(accessory.type) ? (accessory.length ?? 0) : 0;
     const isCloseUp = accessory.type === 'diopter';
     const isEstimatedDistance = accessory.type === 'tube' || isCloseUp;
     const power = Number(accessory.power);
@@ -469,7 +611,11 @@ function renderRig(system, lensOrObjective, accessory, result) {
       { label: wdLabel, value: wd ?? Math.max(lensLength * 0.8, 30), type: 'space', uncertain: wd == null || isEstimatedDistance },
       ...(isCloseUp ? [{ label: Number.isFinite(power) ? `+${power} D` : 'diopter', value: 1, type: 'block' }] : []),
       { label: 'lens', value: lensLength, type: 'block', uncertain: !lensOrObjective.PL },
-      ...(extension > 0 ? [{ label: `${extension} mm`, value: extension, type: 'block' }] : []),
+      ...(extension > 0 ? [{
+        label: accessory.type === 'teleconverter' ? `${accessory.magnification}× TC` : `${extension} mm`,
+        value: extension,
+        type: 'block'
+      }] : []),
       { label: `${flange} mm`, value: flange, type: 'block' }
     ];
   }
@@ -589,7 +735,8 @@ function renderResults(result, objective, lens) {
   out.wd.textContent = estimatedAccessoryDistance && result.workingDistanceMm != null ? `≈${wdText}` : wdText;
   const totalText = formatMm(result.sensorToSubjectMm, 0);
   out.total.textContent = estimatedAccessoryDistance && result.sensorToSubjectMm != null ? `≈${totalText}` : totalText;
-  out.effective.textContent = `f/${result.effectiveFNumber.toFixed(1)}`;
+  const effectivePrefix = result.type === 'camera' && result.pupilMagnificationAssumed ? '≈' : '';
+  out.effective.textContent = `${effectivePrefix}f/${result.effectiveFNumber.toFixed(1)}`;
   out.dof.textContent = formatMm(result.dofMm, result.dofMm < 1 ? 2 : 1);
   out.pitch.textContent = result.pixelPitchUm ? `${result.pixelPitchUm.toFixed(2)} µm` : '—';
   out.subjectPitch.textContent = result.pixelPitchUm && result.magnification
@@ -601,6 +748,7 @@ function renderResults(result, objective, lens) {
     ? `${(result.airyDiameterUm / result.magnification).toFixed(2)} µm`
     : '—';
   out.nyquist.textContent = result.nyquistLpMm ? `${result.nyquistLpMm.toFixed(0)} lp/mm` : '—';
+  out.diffractionContrast.textContent = formatDiffractionResult(result.diffractionContrast);
 
   elements.imageCircleResult.hidden = result.type !== 'objective' || !result.imageCircleMm;
   if (result.type === 'objective' && result.imageCircleMm) {
@@ -617,12 +765,16 @@ function renderResults(result, objective, lens) {
 
   const notes = [...result.warnings];
   if (result.type === 'camera') {
-    notes.unshift('Effective aperture assumes pupil magnification = 1; internal-focus, retrofocus and reversed lenses can differ.');
+    notes.unshift(result.pupilMagnificationAssumed
+      ? 'Estimated effective aperture assumes pupil magnification = 1 because no reliable lens-specific value is stored; internal-focus, retrofocus and reversed lenses can differ.'
+      : `Effective aperture uses the stored pupil magnification of ${result.pupilMagnification}.`);
     notes.push('Working distance uses catalog MFD/barrel geometry or a published free-working-distance value when available. Lenses that extend while focusing can differ.');
   } else if (objective) {
     notes.unshift(`${objective.isPlan ? 'Plan' : 'Non-plan'} objective · NA ${objective.NA}${objective.sourceRef ? ` · ${objective.sourceRef}` : ''}.`);
   }
   notes.push('DOF is geometric defocus for a two-pixel circle of confusion; diffraction is shown separately as Airy diameter.');
+  notes.push('Diffraction contrast models an ideal circular aperture at 550 nm for a light/dark cycle spanning 4 source pixels (half sensor Nyquist). Amber below 20% is an advisory threshold, not an image-quality verdict. Lens aberrations, sensor filtering, processing and motion are not modeled.');
+  notes.push('The box shows the selected source-pixel crop. Suggested wider crops treat that preset as the export dimensions and target the same 20% ideal contrast at a four-output-pixel cycle after reduction. Resampling filters are not modeled; the suggestion does not change the box.');
 
   const noteNodes = notes.map((note) => {
     const p = document.createElement('p');
@@ -896,6 +1048,7 @@ function render() {
   const lockAccessory = !objective && lens?.accessoryModel === false;
   if (lockAccessory && elements.accessory.value !== 'none') elements.accessory.value = 'none';
   const accessory = MACRO_ACCESSORIES_DATA[elements.accessory.value] ?? MACRO_ACCESSORIES_DATA.none;
+  syncApertureLimits(lens, accessory);
   const result = calculate();
   if (!system || !result) return;
 
@@ -923,7 +1076,10 @@ function handleSystemChange() {
   requestedMagnification = null;
   equivalentPreference = null;
   const previousLens = elements.lens.value;
+  const previousAccessory = elements.accessory.value;
   populateLenses(previousLens);
+  populateAccessories(previousAccessory);
+  syncApertureLimits(currentLens(), MACRO_ACCESSORIES_DATA[elements.accessory.value], true);
   const system = currentSystem();
   if (!megapixelsUserSet && system?.typicalMegapixels) elements.megapixels.value = system.typicalMegapixels;
   render();
@@ -931,6 +1087,7 @@ function handleSystemChange() {
 
 populateSystems();
 elements.system.value = defaultState.system;
+populateLenses(defaultState.lens);
 populateAccessories();
 elements.accessory.value = defaultState.accessory;
 elements.aperture.value = defaultState.aperture;
@@ -940,14 +1097,22 @@ loadStateFromUrl();
 elements.lens.addEventListener('change', () => {
   requestedMagnification = null;
   equivalentPreference = null;
+  populateAccessories(elements.accessory.value);
+  syncApertureLimits(currentLens(), MACRO_ACCESSORIES_DATA[elements.accessory.value], true);
   render();
 });
 elements.accessory.addEventListener('change', () => {
   requestedMagnification = null;
   equivalentPreference = null;
+  syncApertureLimits(currentLens(), MACRO_ACCESSORIES_DATA[elements.accessory.value], true);
   render();
 });
 elements.aperture.addEventListener('input', render);
+elements.aperture.addEventListener('change', () => {
+  syncApertureLimits(currentLens(), MACRO_ACCESSORIES_DATA[elements.accessory.value], true);
+  render();
+});
+elements.pixelCrop.addEventListener('change', render);
 elements.megapixels.addEventListener('input', () => {
   megapixelsUserSet = true;
   render();

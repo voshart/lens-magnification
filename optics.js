@@ -1,6 +1,13 @@
 const GREEN_WAVELENGTH_UM = 0.55;
 const DIN_160_IMAGE_DISTANCE_MM = 150;
 const MAGNIFICATION_EPSILON = 1e-12;
+// UI heuristic, not a universal image-quality pass/fail threshold.
+export const DIFFRACTION_WARNING_CONTRAST = 0.2;
+const THIRD_STOP_APERTURES = [
+  0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.4, 1.6, 1.8, 2, 2.2, 2.5, 2.8, 3.2, 3.5,
+  4, 4.5, 5, 5.6, 6.3, 7.1, 8, 9, 10, 11, 13, 14, 16, 18, 20, 22, 25, 29,
+  32, 36, 40, 45, 51, 57, 64
+];
 
 function positiveNumber(value) {
   const number = Number(value);
@@ -101,6 +108,9 @@ function cameraMagnification(lens, accessory) {
       return nativeMag + imageDistance * powerPerMm;
     }
 
+    case 'teleconverter':
+      return nativeMag * (positiveNumber(accessory.magnification) ?? 1);
+
     case 'reversal':
       // Reversed-lens behaviour depends strongly on real lens construction.
       // Only use the prototype's researched/manual estimate; do not invent one.
@@ -109,6 +119,19 @@ function cameraMagnification(lens, accessory) {
     default:
       return nativeMag;
   }
+}
+
+function accessorySupportsLens(lens, accessory) {
+  return !Array.isArray(accessory.compatibleLensIds)
+    || accessory.compatibleLensIds.includes(lens.id);
+}
+
+export function apertureLimits(lens, accessory = { type: 'none' }) {
+  if (!lens) return { widest: null, narrowest: null };
+  return {
+    widest: positiveNumber(accessory.widestAperture) ?? positiveNumber(lens.widestAperture),
+    narrowest: positiveNumber(accessory.narrowestAperture) ?? positiveNumber(lens.narrowestAperture)
+  };
 }
 
 function closeUpWorkingDistanceAtNativeFocus(system, lens, accessory) {
@@ -131,6 +154,7 @@ function cameraWorkingDistance(system, lens, accessory, magnification) {
   if (accessory.type === 'diopter') {
     return closeUpWorkingDistanceAtNativeFocus(system, lens, accessory);
   }
+  if (accessory.type === 'teleconverter') return nativeWorkingDistance(system, lens);
 
   const f = positiveNumber(lens.f);
   const nativeMag = positiveNumber(lens.NM);
@@ -145,6 +169,9 @@ function cameraWorkingDistance(system, lens, accessory, magnification) {
 }
 
 function sensorToSubjectDistance(system, lens, accessory, workingDistance) {
+  if (accessory.type === 'teleconverter') {
+    return positiveNumber(accessory.minimumFocusDistanceMm);
+  }
   if (accessory.type === 'none') {
     // Catalog MFD is measured from the focal plane and is more defensible than
     // reconstructing the same distance from barrel geometry. For zooms only
@@ -184,16 +211,94 @@ function fieldOfView(system, magnification) {
   };
 }
 
+// Ideal unobstructed circular aperture, incoherent light at 550 nm.
+// MTF at 0.25 cycles/source pixel: a light/dark cycle spanning four pixels.
+// See Optikos, How to Measure MTF and other Properties of Lenses, pp. 46–47.
+export function diffractionContrastAtFourPixels(effectiveFNumber, pitchUm) {
+  const fNumber = positiveNumber(effectiveFNumber);
+  const pitch = positiveNumber(pitchUm);
+  if (!fNumber || !pitch) return null;
+
+  const frequencyRatio = GREEN_WAVELENGTH_UM * fNumber / (4 * pitch);
+  if (frequencyRatio >= 1) return 0;
+  return 2 / Math.PI * (Math.acos(frequencyRatio)
+    - frequencyRatio * Math.sqrt(1 - frequencyRatio * frequencyRatio));
+}
+
+// Find a wider source crop for a fixed export size. Four output pixels
+// cover more sensor area after downsampling; this models diffraction only.
+export function suggestedDiffractionCrop({
+  effectiveFNumber, pitchUm, widthPx, heightPx, sensorWidthMm, sensorHeightMm
+}) {
+  if (![effectiveFNumber, pitchUm, widthPx, heightPx, sensorWidthMm, sensorHeightMm]
+    .every((value) => positiveNumber(value))) return null;
+
+  let lower = 1;
+  let upper = diffractionContrastAtFourPixels(effectiveFNumber, pitchUm) >= DIFFRACTION_WARNING_CONTRAST
+    ? 1 : Math.max(1, GREEN_WAVELENGTH_UM * effectiveFNumber / (2 * pitchUm));
+  for (let i = 0; i < 50; i += 1) {
+    const scale = (lower + upper) / 2;
+    if (diffractionContrastAtFourPixels(effectiveFNumber, pitchUm * scale) < DIFFRACTION_WARNING_CONTRAST) {
+      lower = scale;
+    } else {
+      upper = scale;
+    }
+  }
+  const sourceWidthPx = Math.ceil(widthPx * upper);
+  const sourceHeightPx = Math.ceil(heightPx * upper);
+  return {
+    sourceWidthPx,
+    sourceHeightPx,
+    fitsSensor: sourceWidthPx * pitchUm / 1000 <= sensorWidthMm
+      && sourceHeightPx * pitchUm / 1000 <= sensorHeightMm
+  };
+}
+
+function diffractionApertureRecommendation(
+  markedAperture,
+  lensSideMagnification,
+  pupilMagnification,
+  pitchUm,
+  limits
+) {
+  const current = positiveNumber(markedAperture);
+  const pupil = positiveNumber(pupilMagnification);
+  const pitch = positiveNumber(pitchUm);
+  const widest = positiveNumber(limits.widest);
+  if (!current || !pupil || !pitch || !widest) return null;
+
+  const choices = [...new Set([...THIRD_STOP_APERTURES, widest])]
+    .filter((aperture) => aperture >= widest && aperture < current)
+    .sort((a, b) => b - a);
+  if (!choices.length) return null;
+
+  const contrastAt = (aperture) => diffractionContrastAtFourPixels(
+    aperture * (1 + lensSideMagnification / pupil),
+    pitch
+  );
+  const clearingAperture = choices.find((aperture) => (
+    contrastAt(aperture) >= DIFFRACTION_WARNING_CONTRAST
+  ));
+  const aperture = clearingAperture ?? widest;
+  const contrast = contrastAt(aperture);
+  return {
+    aperture,
+    contrast,
+    clearsThreshold: contrast >= DIFFRACTION_WARNING_CONTRAST
+  };
+}
+
 function samplingDetails(effectiveFNumber, pitchUm) {
   if (!effectiveFNumber || !pitchUm) {
-    return { airyDiameterUm: null, airyPixels: null, nyquistLpMm: null };
+    return { airyDiameterUm: null, airyPixels: null, nyquistLpMm: null, diffractionContrast: null };
   }
 
   const airyDiameterUm = 2.44 * GREEN_WAVELENGTH_UM * effectiveFNumber;
   return {
     airyDiameterUm,
     airyPixels: airyDiameterUm / pitchUm,
-    nyquistLpMm: 500 / pitchUm
+    nyquistLpMm: 500 / pitchUm,
+    diffractionContrast: diffractionContrastAtFourPixels(effectiveFNumber, pitchUm)
   };
 }
 
@@ -210,11 +315,35 @@ export function calculateCameraSetup({ system, lens, accessory, aperture, megapi
     return { type: 'camera', valid: false, reason: 'Enter a valid aperture.' };
   }
 
+  if (!accessorySupportsLens(lens, accessory)) {
+    return {
+      type: 'camera',
+      valid: false,
+      reason: `${accessory.name} is not compatible with this lens.`
+    };
+  }
+
   if (lens.accessoryModel === false && accessory.type !== 'none') {
     return {
       type: 'camera',
       valid: false,
       reason: 'Accessory stacking is not modeled for this dedicated high-magnification lens preset.'
+    };
+  }
+
+  const limits = apertureLimits(lens, accessory);
+  if (limits.widest && markedAperture < limits.widest) {
+    return {
+      type: 'camera',
+      valid: false,
+      reason: `This setup cannot open wider than f/${limits.widest}.`
+    };
+  }
+  if (limits.narrowest && markedAperture > limits.narrowest) {
+    return {
+      type: 'camera',
+      valid: false,
+      reason: `This setup cannot stop down beyond f/${limits.narrowest}.`
     };
   }
 
@@ -239,11 +368,36 @@ export function calculateCameraSetup({ system, lens, accessory, aperture, megapi
   }
 
   const pitchUm = pixelPitchUm(system, megapixels);
-  const effectiveFNumber = markedAperture * (1 + magnification);
+  // A teleconverter's composite f-number is what the camera displays. Its
+  // magnification has already been included in that number, so macro bellows
+  // factor uses the lens-side magnification rather than multiplying it twice.
+  const teleconverterFactor = accessory.type === 'teleconverter'
+    ? (positiveNumber(accessory.magnification) ?? 1)
+    : 1;
+  const lensSideMagnification = magnification / teleconverterFactor;
+  // Working f-number is N * (1 + m / P), where P is exit-pupil diameter
+  // divided by entrance-pupil diameter. Camera manufacturers rarely publish
+  // P, so retain the common symmetric-lens approximation when it is unknown
+  // and expose that assumption to the interface instead of implying measured
+  // lens-specific performance.
+  const catalogPupilMagnification = positiveNumber(lens.pupilMagnification);
+  const pupilMagnification = catalogPupilMagnification ?? 1;
+  const pupilMagnificationAssumed = catalogPupilMagnification == null;
+  const effectiveFNumber = markedAperture * (1 + lensSideMagnification / pupilMagnification);
   const workingDistanceMm = cameraWorkingDistance(system, lens, accessory, magnification);
   const sensorToSubjectMm = sensorToSubjectDistance(system, lens, accessory, workingDistanceMm);
   const fov = fieldOfView(system, magnification);
   const sampling = samplingDetails(effectiveFNumber, pitchUm);
+  const apertureRecommendation = Number.isFinite(sampling.diffractionContrast)
+    && sampling.diffractionContrast < DIFFRACTION_WARNING_CONTRAST
+    ? diffractionApertureRecommendation(
+      markedAperture,
+      lensSideMagnification,
+      pupilMagnification,
+      pitchUm,
+      limits
+    )
+    : null;
   const dofMm = geometricDofMm(magnification, effectiveFNumber, pitchUm);
   const warnings = [];
 
@@ -262,6 +416,9 @@ export function calculateCameraSetup({ system, lens, accessory, aperture, megapi
   if (accessory.type === 'tube') {
     warnings.push('Extension-tube magnification and distance estimates assume the lens remains at its published native maximum-magnification setting, with nominal focal length and fixed principal-plane/front-barrel geometry.');
   }
+  if (accessory.type === 'teleconverter') {
+    warnings.push('Teleconverter magnification, composite aperture and closest-focus distance use the manufacturer-published combination data. Optical sharpness loss from the converter is not modeled.');
+  }
   if (accessory.type === 'reversal') {
     warnings.push('Reversed-lens magnification is a legacy prototype estimate, not a catalog specification; working distance and pupil magnification are not modeled.');
   }
@@ -274,6 +431,11 @@ export function calculateCameraSetup({ system, lens, accessory, aperture, megapi
     workingDistanceMm,
     sensorToSubjectMm,
     effectiveFNumber,
+    pupilMagnification,
+    pupilMagnificationAssumed,
+    markedAperture,
+    widestAperture: limits.widest,
+    apertureRecommendation,
     dofMm,
     pixelPitchUm: pitchUm,
     ...sampling,

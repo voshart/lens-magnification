@@ -9,14 +9,19 @@ Live site: <https://macro.voshart.com>
 - Camera and sensor presets across multiple lens systems
 - Same-mount full-frame lenses remain available on compatible APS-C mirrorless bodies
 - Macro, close-focus, and high-magnification lens presets
+- Laowa Aksen 45 mm 1–5× and 17.5 mm 5–10× endpoint presets on supported mirrorless mounts
 - Extension-tube, close-up-lens, and reversed-lens estimates
+- OM SYSTEM MC-14 and MC-20 combinations for the compatible 90 mm Macro PRO
 - Generic +5 D, +8 D, and +9 D power-only close-up-lens presets plus documented products from Raynox, NiSi, Kenko, Marumi, and Canon
 - DIN 160 mm finite microscope objectives
 - Target-magnification matching
 - Sensor preview with familiar reference objects
+- Optional pixel-crop overlay (off by default), with square, portrait, and landscape presets and subject coverage estimated from sensor dimensions and MP
+- Amber crop outline and advisory when estimated diffraction contrast falls below 20% at a four-source-pixel light/dark cycle
 - Field of view, working distance, sensor-to-subject distance, effective aperture, and depth of field
 - Pixel pitch, subject sampling, Airy-disk size, Nyquist frequency, and objective image-circle details
 - Shareable configurations stored in the page URL
+- Lens-aware aperture limits; values wider than the selected lens and documented narrow-end limits are rejected
 
 ## Run locally
 
@@ -27,6 +32,20 @@ python3 -m http.server 8000
 ```
 
 Then open <http://localhost:8000>.
+
+## Pixel crop and diffraction warning
+
+Crop presets range from 500 × 500 to 3,840 × 2,160 source pixels, with square, portrait and landscape shapes. Sizes are estimated from sensor dimensions and MP, assuming square pixels. Changing the preset changes the crop's coverage, not sharpness per source pixel.
+
+The amber outline estimates diffraction contrast using an ideal unobstructed circular aperture at 550 nm. It evaluates MTF at 0.25 cycles/source pixel (a light/dark cycle spanning four pixels). With `q = wavelength × effective f-number / (4 × pixel pitch)`, contrast is `2/π × (acos(q) − q × sqrt(1 − q²))` for `q < 1`, and zero at or beyond the diffraction cutoff. The interface describes a zero result as being at or beyond the ideal cutoff instead of displaying `0.0%`. Other results are rounded to whole percentages. See [Optikos's MTF guide](https://www.optikos.com/wp-content/uploads/2015/10/How-to-Measure-MTF-and-other-Properties-of-Lenses.pdf).
+
+For camera lenses, working f-number is `marked f-number × (1 + magnification / pupil magnification)`. The calculation can use a stored lens-specific pupil magnification, but the current catalog has no reliable values. It therefore uses the common pupil-magnification value of 1 and marks the effective aperture as approximate. This is the same simplifying form described in [Edmund Optics' working f-number guide](https://www.edmundoptics.com/knowledge-center/application-notes/imaging/lens-iris-aperture-setting/). Microscope-objective diffraction instead derives from the objective's published numerical aperture.
+
+Contrast below 20% triggers an advisory; this threshold is a UI heuristic, not a universal resolution standard. The warning gives a suggested wider source crop to resize to the selected preset's dimensions for export, instead of displaying contrast percentages. It finds the reduction factor needed to reach the same 20% ideal contrast at a four-output-pixel cycle, rounds source dimensions up to whole pixels, and checks both dimensions against the sensor. If that crop cannot fit, it suggests a smaller output size. The box continues to show the selected source crop; suggestions do not resize it automatically.
+
+When possible, the advisory also identifies the nearest wider one-third-stop aperture that clears the guide and provides a control to apply it. If no available aperture clears 20%, it offers the widest setting to reduce diffraction. The result is an ideal diffraction-only calculation, not measured lens sharpness. It excludes lens aberrations, sensor filtering, image processing, motion and resampling-filter effects. It does not certify sharpness when no warning appears. Longer extension tubes can trigger it by increasing the estimated effective f-number; length alone does not determine image quality. Crops that exceed the sensor's pixel dimensions instead show a size warning and no box. The detailed contrast readout and calculation notes retain the model assumptions.
+
+Run the optical calculation checks with `node --test tests/*.test.mjs`.
 
 ## Project structure
 

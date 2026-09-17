@@ -16,4 +16,5 @@ dist/
 Thumbs.db
 *.log
 
+# Image sources
 IMG_SOURCE/

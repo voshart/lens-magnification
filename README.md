@@ -24,6 +24,8 @@ Live site: <https://macro.voshart.com>
 - Shareable configurations stored in the page URL
 - Lens-aware aperture limits; values wider than the selected lens and documented narrow-end limits are rejected
 
+The 90 mm Macro PRO with MC-20 is modeled at its 4× S-MACRO endpoint, where the widest available aperture is f/10. Aperture validation and diffraction suggestions use that limit; f/7.1 is not available at this endpoint. Shared URLs requesting a wider aperture show a validation error until corrected.
+
 ## Run locally
 
 The project has no build step or package dependencies. Because it uses JavaScript modules, serve the directory over HTTP instead of opening `index.html` directly:

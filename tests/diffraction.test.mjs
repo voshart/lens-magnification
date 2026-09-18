@@ -136,15 +136,17 @@ test('recommendation falls back to the widest aperture when the guide cannot be 
     aperture: 11,
     megapixels: 20
   });
-  assert.equal(atF11.apertureRecommendation.aperture, 7.1);
+  assert.equal(atF11.apertureRecommendation.aperture, 10);
   assert.equal(atF11.apertureRecommendation.clearsThreshold, false);
-  assert.ok(atF11.apertureRecommendation.contrast > atF11.diffractionContrast);
+  // Even the corrected widest setting remains beyond the ideal cutoff at 20 MP.
+  assert.equal(atF11.apertureRecommendation.contrast, 0);
+  assert.equal(atF11.diffractionContrast, 0);
 
   const wideOpen = calculateCameraSetup({
     system: m43,
     lens: macro90,
     accessory: MACRO_ACCESSORIES_DATA.om_mc_20,
-    aperture: 7.1,
+    aperture: 10,
     megapixels: 20
   });
   assert.equal(wideOpen.apertureRecommendation, null);

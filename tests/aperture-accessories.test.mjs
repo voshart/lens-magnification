@@ -54,7 +54,7 @@ test('MC-14 and MC-20 model the official 90 mm S-MACRO combinations', () => {
   const mc14 = MACRO_ACCESSORIES_DATA.om_mc_14;
   const mc20 = MACRO_ACCESSORIES_DATA.om_mc_20;
   assert.deepEqual(apertureLimits(lens, mc14), { widest: 5, narrowest: 22 });
-  assert.deepEqual(apertureLimits(lens, mc20), { widest: 7.1, narrowest: 22 });
+  assert.deepEqual(apertureLimits(lens, mc20), { widest: 10, narrowest: 22 });
 
   const with14 = calculateCameraSetup({ system, lens, accessory: mc14, aperture: 5, megapixels: 20 });
   assert.equal(with14.valid, true);
@@ -62,11 +62,31 @@ test('MC-14 and MC-20 model the official 90 mm S-MACRO combinations', () => {
   assert.equal(with14.effectiveFNumber, 15);
   assert.equal(with14.sensorToSubjectMm, 239);
 
-  const with20 = calculateCameraSetup({ system, lens, accessory: mc20, aperture: 7.1, megapixels: 20 });
+  const with20 = calculateCameraSetup({ system, lens, accessory: mc20, aperture: 10, megapixels: 20 });
   assert.equal(with20.valid, true);
   assert.equal(with20.magnification, 4);
-  assert.ok(Math.abs(with20.effectiveFNumber - 21.3) < 1e-12);
+  assert.equal(with20.effectiveFNumber, 30);
   assert.equal(with20.sensorToSubjectMm, 250);
+});
+
+test('reported MC-20 URL cannot calculate at an aperture wider than f/10', () => {
+  const params = new URLSearchParams('system=m43&lens=om_system_mzuiko_90mm_f3_5_macro_is_pro&accessory=om_mc_20&f=7.1&mp=22&crop=1080x1350');
+  const system = LENSES_BY_SYSTEM[params.get('system')];
+  const setup = {
+    system,
+    lens: system.lenses[params.get('lens')],
+    accessory: MACRO_ACCESSORIES_DATA[params.get('accessory')],
+    megapixels: Number(params.get('mp'))
+  };
+  for (const aperture of [Number(params.get('f')), 8, 9.9]) {
+    const result = calculateCameraSetup({ ...setup, aperture });
+    assert.equal(result.valid, false);
+    assert.match(result.reason, /cannot open wider than f\/10/);
+  }
+  for (const aperture of [10, 11, 22]) {
+    assert.equal(calculateCameraSetup({ ...setup, aperture }).valid, true);
+  }
+  assert.equal(calculateCameraSetup({ ...setup, aperture: 22.1 }).valid, false);
 });
 
 test('OM teleconverters are rejected on incompatible lenses', () => {

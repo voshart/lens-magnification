@@ -134,6 +134,22 @@ export function apertureLimits(lens, accessory = { type: 'none' }) {
   };
 }
 
+// Navigation may change the lens, so its current accessory and aperture must
+// not exclude otherwise available magnifications. Keep the accessory when the
+// destination supports it; otherwise offer the bare lens.
+export function cameraNavigationSetup({ system, lens, accessory, aperture, megapixels }) {
+  for (const candidateAccessory of [accessory, { type: 'none' }]) {
+    const limits = apertureLimits(lens, candidateAccessory);
+    const candidateAperture = Math.min(limits.narrowest ?? Infinity,
+      Math.max(limits.widest ?? 0.7, positiveNumber(aperture) ?? 8));
+    const result = calculateCameraSetup({
+      system, lens, accessory: candidateAccessory, aperture: candidateAperture, megapixels
+    });
+    if (result.valid) return { accessory: candidateAccessory, aperture: candidateAperture, result };
+  }
+  return null;
+}
+
 function closeUpWorkingDistanceAtNativeFocus(system, lens, accessory) {
   const nativeWd = nativeWorkingDistance(system, lens);
   const powerPerMm = (positiveNumber(accessory.power) ?? 0) / 1000;

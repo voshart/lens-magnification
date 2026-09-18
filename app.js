@@ -10,6 +10,7 @@ import {
   DIFFRACTION_WARNING_CONTRAST,
   apertureLimits,
   calculateCameraSetup,
+  cameraNavigationSetup,
   calculateObjectiveSetup,
   suggestedDiffractionCrop,
   focusStackPlan,
@@ -897,10 +898,14 @@ function magnificationCandidates() {
   const candidates = [];
 
   for (const [lensId, lens] of Object.entries(system.lenses ?? {})) {
-    const result = calculateCameraSetup({ system, lens, accessory, aperture, megapixels });
+    const setup = cameraNavigationSetup({ system, lens, accessory, aperture, megapixels });
+    if (!setup) continue;
+    const { result } = setup;
     if (result.valid && Number.isFinite(result.magnification) && result.magnification > 0) {
       candidates.push({
         lensId,
+        accessoryId: setup.accessory === accessory ? elements.accessory.value : 'none',
+        aperture: setup.aperture,
         magnification: result.magnification,
         workingDistanceMm: result.workingDistanceMm,
         kind: 'lens',
@@ -974,16 +979,19 @@ function compareEquivalentCandidates(a, b) {
 }
 
 function equivalentOptionLabel(candidate) {
+  const accessoryChange = candidate.kind === 'lens' && candidate.accessoryId !== elements.accessory.value
+    ? ' · no accessory' : '';
+  const label = `${candidate.label}${accessoryChange}`;
   if (!Number.isFinite(candidate.workingDistanceMm) || candidate.workingDistanceMm <= 0) {
-    return `${candidate.label} — WD unknown`;
+    return `${label} — WD unknown`;
   }
 
   const digits = candidate.workingDistanceMm < 10 ? 2 : 1;
-  const accessoryType = MACRO_ACCESSORIES_DATA[elements.accessory.value]?.type;
+  const accessoryType = MACRO_ACCESSORIES_DATA[candidate.accessoryId]?.type;
   const estimated = candidate.kind === 'lens'
     && (accessoryType === 'tube' || accessoryType === 'diopter');
   const prefix = estimated ? '≈' : '';
-  return `${candidate.label} — WD ${prefix}${formatMm(candidate.workingDistanceMm, digits)}`;
+  return `${label} — WD ${prefix}${formatMm(candidate.workingDistanceMm, digits)}`;
 }
 
 function renderEquivalentPicker(candidates, target) {
@@ -1058,6 +1066,13 @@ function renderMagnificationPicker(result, objective, lens) {
   }
 }
 
+function applyMagnificationCandidate(candidate) {
+  elements.lens.value = candidate.lensId;
+  populateAccessories(candidate.accessoryId ?? elements.accessory.value);
+  if (candidate.aperture != null) elements.aperture.value = candidate.aperture;
+  syncApertureLimits(currentLens(), MACRO_ACCESSORIES_DATA[elements.accessory.value], true);
+}
+
 function selectMagnificationTarget(target) {
   const candidates = magnificationCandidates();
   const equivalents = closestMagnificationCandidates(candidates, target);
@@ -1075,7 +1090,7 @@ function selectMagnificationTarget(target) {
   if (!candidate) return;
 
   requestedMagnification = target;
-  elements.lens.value = candidate.lensId;
+  applyMagnificationCandidate(candidate);
   render();
 }
 
@@ -1225,7 +1240,7 @@ elements.equivalentLens.addEventListener('change', () => {
     lensId: candidate.lensId,
     magnification: candidate.magnification
   };
-  elements.lens.value = candidate.lensId;
+  applyMagnificationCandidate(candidate);
   render();
 });
 window.addEventListener('resize', render);

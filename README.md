@@ -15,6 +15,7 @@ Live site: <https://macro.voshart.com>
 - Generic +5 D, +8 D, and +9 D power-only close-up-lens presets plus documented products from Raynox, NiSi, Kenko, Marumi, and Canon
 - DIN 160 mm finite microscope objectives
 - Target-magnification matching
+- Magnification navigation keeps compatible accessories, falls back to a bare lens when needed, and adjusts aperture to the destination setup's limits
 - Sensor preview with familiar reference objects
 - Optional pixel-crop overlay (off by default), with square, portrait, and landscape presets and subject coverage estimated from sensor dimensions and MP
 - Amber crop outline and advisory when estimated diffraction contrast falls below 20% at a four-source-pixel light/dark cycle

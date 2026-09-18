@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   diffractionContrastAtFourPixels,
   suggestedDiffractionCrop,
+  focusStackPlan,
   calculateCameraSetup,
   calculateObjectiveSetup,
   DIFFRACTION_WARNING_CONTRAST
@@ -60,6 +61,30 @@ test('crop guidance stays unavailable when required inputs are missing or invali
       assert.equal(suggestedDiffractionCrop({ ...cropInputs, [key]: invalid }), null);
     }
   }
+});
+
+test('focus-stack planner covers both endpoints with the requested overlap', () => {
+  assert.deepEqual(focusStackPlan({ depthMm: 1, dofMm: 0.2, overlap: 0.5 }), {
+    spacingMm: 0.1,
+    frames: 9,
+    coveredDepthMm: 1
+  });
+  assert.deepEqual(focusStackPlan({ depthMm: 0.2, dofMm: 0.2, overlap: 0.5 }), {
+    spacingMm: 0.1,
+    frames: 1,
+    coveredDepthMm: 0.2
+  });
+  assert.deepEqual(focusStackPlan({ depthMm: 1, dofMm: 0.3, overlap: 0.5 }), {
+    spacingMm: 0.15,
+    frames: 6,
+    coveredDepthMm: 1.05
+  });
+});
+
+test('focus-stack planner validates physical inputs and overlap', () => {
+  assert.equal(focusStackPlan({ depthMm: 1, dofMm: 0.2, overlap: 1 }), null);
+  assert.equal(focusStackPlan({ depthMm: 0, dofMm: 0.2, overlap: 0.5 }), null);
+  assert.equal(focusStackPlan({ depthMm: 1, dofMm: null, overlap: 0.5 }), null);
 });
 
 const system = LENSES_BY_SYSTEM.sony_e_ff;

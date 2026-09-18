@@ -134,6 +134,10 @@ input:focus {
   box-shadow: 0 0 0 1px var(--accent);
 }
 
+input[aria-invalid="true"] {
+  border-color: var(--warning);
+}
+
 [hidden] { display: none !important; }
 
 .workspace {
@@ -266,6 +270,80 @@ dd {
   margin: 10px 0 0;
   color: var(--warning);
   font-size: 0.76rem;
+}
+
+.focus-stack {
+  border-bottom: 1px solid var(--rule);
+}
+
+.focus-stack > summary {
+  cursor: pointer;
+  padding: 9px 0;
+  color: var(--accent);
+  font-size: 0.78rem;
+  user-select: none;
+}
+
+.focus-stack-body {
+  padding: 3px 0 12px;
+}
+
+.focus-stack-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.input-with-unit,
+.input-with-suffix {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.input-with-unit input,
+.input-with-suffix input {
+  border-radius: 2px 0 0 2px;
+}
+
+.input-with-unit select {
+  width: 62px;
+  border-left: 0;
+  border-radius: 0 2px 2px 0;
+}
+
+.input-with-suffix > span {
+  display: grid;
+  place-items: center;
+  min-width: 38px;
+  height: 36px;
+  border: 1px solid var(--rule);
+  border-left: 0;
+  border-radius: 0 2px 2px 0;
+  color: var(--ink-2);
+  background: var(--paper-2);
+  font-size: 0.8rem;
+}
+
+.focus-stack-results {
+  margin: 10px 0 0;
+}
+
+.focus-stack-results > div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  padding: 5px 0;
+  border-top: 1px solid var(--rule);
+}
+
+.focus-stack-results dd {
+  font-weight: 600;
+}
+
+.focus-stack-help {
+  margin: 7px 0 0;
+  color: var(--ink-2);
+  font-size: 0.7rem;
 }
 
 .rig-panel {

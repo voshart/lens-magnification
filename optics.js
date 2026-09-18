@@ -309,6 +309,24 @@ function geometricDofMm(magnification, effectiveFNumber, pitchUm) {
   return 2 * effectiveFNumber * cocMm / (magnification * magnification);
 }
 
+export function focusStackPlan({ depthMm, dofMm, overlap = 0.5 }) {
+  const depth = positiveNumber(depthMm);
+  const dof = positiveNumber(dofMm);
+  const overlapRatio = Number(overlap);
+  if (!depth || !dof || !Number.isFinite(overlapRatio)
+    || overlapRatio < 0 || overlapRatio >= 1) return null;
+
+  const spacingMm = dof * (1 - overlapRatio);
+  const frames = depth <= dof
+    ? 1
+    : Math.ceil((depth - dof) / spacingMm - 1e-12) + 1;
+  return {
+    spacingMm,
+    frames,
+    coveredDepthMm: dof + (frames - 1) * spacingMm
+  };
+}
+
 export function calculateCameraSetup({ system, lens, accessory, aperture, megapixels }) {
   const markedAperture = positiveNumber(aperture);
   if (!markedAperture) {

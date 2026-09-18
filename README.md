@@ -19,6 +19,7 @@ Live site: <https://macro.voshart.com>
 - Optional pixel-crop overlay (off by default), with square, portrait, and landscape presets and subject coverage estimated from sensor dimensions and MP
 - Amber crop outline and advisory when estimated diffraction contrast falls below 20% at a four-source-pixel light/dark cycle
 - Field of view, working distance, sensor-to-subject distance, effective aperture, and depth of field
+- Expandable focus-stack planner with target depth, adjustable overlap, object-space spacing, and estimated frame count
 - Pixel pitch, subject sampling, Airy-disk size, Nyquist frequency, and objective image-circle details
 - Shareable configurations stored in the page URL
 - Lens-aware aperture limits; values wider than the selected lens and documented narrow-end limits are rejected
@@ -46,6 +47,12 @@ Contrast below 20% triggers an advisory; this threshold is a UI heuristic, not a
 When possible, the advisory also identifies the nearest wider one-third-stop aperture that clears the guide and provides a control to apply it. If no available aperture clears 20%, it offers the widest setting to reduce diffraction. The result is an ideal diffraction-only calculation, not measured lens sharpness. It excludes lens aberrations, sensor filtering, image processing, motion and resampling-filter effects. It does not certify sharpness when no warning appears. Longer extension tubes can trigger it by increasing the estimated effective f-number; length alone does not determine image quality. Crops that exceed the sensor's pixel dimensions instead show a size warning and no box. The detailed contrast readout and calculation notes retain the model assumptions.
 
 Run the optical calculation checks with `node --test tests/*.test.mjs`.
+
+## Focus-stack planner
+
+The planner beneath the depth-of-field result uses the current geometric DOF at a two-source-pixel circle of confusion. For requested depth `D`, DOF `d`, and overlap ratio `o`, focus-plane spacing is `d × (1 − o)`. The estimated frame count is one when `D ≤ d`; otherwise it is `ceil((D − d) / spacing) + 1`, so the first and last frames cover both ends of the requested range. The default overlap is 50%.
+
+Spacing is object-space movement suitable for planning a focusing rail or moving the subject. It is not a camera focus-bracketing step value, because manufacturers do not define those steps as a universal physical distance. The estimate uses source-pixel sampling; final downscaling may tolerate a larger circle of confusion and require fewer frames. Diffraction, subject movement, focus breathing, alignment losses, and stacking artifacts can still affect the result.
 
 ## Project structure
 

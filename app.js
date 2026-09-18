@@ -12,6 +12,7 @@ import {
   calculateCameraSetup,
   calculateObjectiveSetup,
   suggestedDiffractionCrop,
+  focusStackPlan,
   closestMagnificationCandidate,
   closestMagnificationCandidates
 } from './optics.js';
@@ -42,6 +43,11 @@ const elements = {
   status: $('status'),
   notes: $('notes'),
   imageCircleResult: $('image-circle-result'),
+  stackDepth: $('stack-depth'),
+  stackDepthUnit: $('stack-depth-unit'),
+  stackOverlap: $('stack-overlap'),
+  stackSpacing: $('out-stack-spacing'),
+  stackFrames: $('out-stack-frames'),
   magnificationSlider: $('magnification-slider'),
   magnificationNotches: $('magnification-notches'),
   magnificationTarget: $('magnification-target'),
@@ -246,8 +252,18 @@ function loadStateFromUrl() {
   const aperture = Number(params.get('f'));
   const megapixels = Number(params.get('mp'));
   const crop = params.get('crop');
+  const stackDepth = Number(params.get('stackDepth'));
+  const stackUnit = params.get('stackUnit');
+  const stackOverlap = Number(params.get('stackOverlap'));
   if ([...elements.pixelCrop.options].some((item) => item.value === crop)) {
     elements.pixelCrop.value = crop;
+  }
+  if (Number.isFinite(stackDepth) && stackDepth > 0) elements.stackDepth.value = stackDepth;
+  if (stackUnit === 'um' || stackUnit === 'mm') elements.stackDepthUnit.value = stackUnit;
+  syncStackDepthUnit();
+  if (params.has('stackOverlap')
+    && Number.isFinite(stackOverlap) && stackOverlap >= 0 && stackOverlap <= 90) {
+    elements.stackOverlap.value = stackOverlap;
   }
 
   if (system && LENSES_BY_SYSTEM[system]) elements.system.value = system;
@@ -274,6 +290,17 @@ function saveStateToUrl() {
   const megapixels = Number(elements.megapixels.value);
   if (Number.isFinite(megapixels) && megapixels > 0) params.set('mp', megapixels.toString());
   if (elements.pixelCrop.value !== 'off') params.set('crop', elements.pixelCrop.value);
+  const stackDepth = Number(elements.stackDepth.value);
+  const stackOverlap = Number(elements.stackOverlap.value);
+  if (Number.isFinite(stackDepth) && stackDepth > 0
+    && (stackDepth !== 1000 || elements.stackDepthUnit.value !== 'um')) {
+    params.set('stackDepth', stackDepth.toString());
+    params.set('stackUnit', elements.stackDepthUnit.value);
+  }
+  if (Number.isFinite(stackOverlap)
+    && stackOverlap >= 0 && stackOverlap <= 90 && stackOverlap !== 50) {
+    params.set('stackOverlap', stackOverlap.toString());
+  }
 
   history.replaceState(null, '', `${location.pathname}?${params}${location.hash}`);
 }
@@ -282,6 +309,15 @@ function formatMm(value, digits = 1) {
   if (value == null || !Number.isFinite(value)) return '—';
   if (value < 0.1) return `${(value * 1000).toFixed(value < 0.01 ? 1 : 0)} µm`;
   return `${value.toFixed(digits)} mm`;
+}
+
+function formatStackDistance(valueMm) {
+  if (valueMm == null || !Number.isFinite(valueMm)) return '—';
+  if (valueMm < 1) {
+    const valueUm = valueMm * 1000;
+    return `${valueUm.toFixed(valueUm < 10 ? 1 : 0)} µm`;
+  }
+  return `${valueMm.toFixed(valueMm < 10 ? 2 : 1)} mm`;
 }
 
 function formatFov(fov) {
@@ -305,6 +341,46 @@ function formatDiffractionResult(contrast) {
   if (!Number.isFinite(contrast)) return '—';
   if (contrast === 0) return 'At/beyond ideal cutoff';
   return formatDiffractionPercent(contrast);
+}
+
+function renderFocusStack(result) {
+  elements.stackSpacing.textContent = '—';
+  elements.stackFrames.textContent = '—';
+  if (!result.valid || !Number.isFinite(result.dofMm)) return;
+
+  const enteredDepth = Number(elements.stackDepth.value);
+  const depthMm = elements.stackDepthUnit.value === 'um'
+    ? enteredDepth / 1000
+    : enteredDepth;
+  const overlapPercent = Number(elements.stackOverlap.value);
+  const depthValid = Number.isFinite(depthMm) && depthMm > 0;
+  const overlapValid = Number.isFinite(overlapPercent)
+    && overlapPercent >= 0 && overlapPercent <= 90;
+  for (const [control, valid] of [
+    [elements.stackDepth, depthValid],
+    [elements.stackOverlap, overlapValid]
+  ]) {
+    if (valid) control.removeAttribute('aria-invalid');
+    else control.setAttribute('aria-invalid', 'true');
+  }
+  if (!depthValid || !overlapValid) {
+    elements.stackFrames.textContent = 'Check inputs';
+    return;
+  }
+  const plan = focusStackPlan({
+    depthMm,
+    dofMm: result.dofMm,
+    overlap: overlapPercent / 100
+  });
+  if (!plan) {
+    elements.stackFrames.textContent = 'Check inputs';
+    return;
+  }
+
+  elements.stackSpacing.textContent = formatStackDistance(plan.spacingMm);
+  elements.stackFrames.textContent = plan.frames === 1
+    ? '1 frame'
+    : `${plan.frames.toLocaleString('en-US')} frames`;
 }
 
 function setSvgDimensions(width, height) {
@@ -723,6 +799,7 @@ function renderResults(result, objective, lens) {
     for (const node of Object.values(out)) node.textContent = '—';
     elements.status.textContent = result.reason;
     elements.notes.replaceChildren(...provenance);
+    renderFocusStack(result);
     return;
   }
 
@@ -738,6 +815,7 @@ function renderResults(result, objective, lens) {
   const effectivePrefix = result.type === 'camera' && result.pupilMagnificationAssumed ? '≈' : '';
   out.effective.textContent = `${effectivePrefix}f/${result.effectiveFNumber.toFixed(1)}`;
   out.dof.textContent = formatMm(result.dofMm, result.dofMm < 1 ? 2 : 1);
+  renderFocusStack(result);
   out.pitch.textContent = result.pixelPitchUm ? `${result.pixelPitchUm.toFixed(2)} µm` : '—';
   out.subjectPitch.textContent = result.pixelPitchUm && result.magnification
     ? `${(result.pixelPitchUm / result.magnification).toFixed(2)} µm/px`
@@ -1113,6 +1191,23 @@ elements.aperture.addEventListener('change', () => {
   render();
 });
 elements.pixelCrop.addEventListener('change', render);
+elements.stackDepth.addEventListener('input', render);
+elements.stackOverlap.addEventListener('input', render);
+function syncStackDepthUnit() {
+  elements.stackDepth.step = elements.stackDepthUnit.value === 'um' ? '10' : '0.01';
+  elements.stackDepth.min = elements.stackDepthUnit.value === 'um' ? '0.1' : '0.0001';
+}
+
+elements.stackDepthUnit.addEventListener('change', () => {
+  const previousUnit = elements.stackDepthUnit.value === 'um' ? 'mm' : 'um';
+  const depth = Number(elements.stackDepth.value);
+  if (Number.isFinite(depth) && depth > 0) {
+    const converted = previousUnit === 'um' ? depth / 1000 : depth * 1000;
+    elements.stackDepth.value = Number(converted.toPrecision(8)).toString();
+  }
+  syncStackDepthUnit();
+  render();
+});
 elements.megapixels.addEventListener('input', () => {
   megapixelsUserSet = true;
   render();

@@ -181,6 +181,35 @@
           <div><dt>Effective aperture</dt><dd id="out-effective">—</dd></div>
           <div><dt>DOF <small>(2 px CoC)</small></dt><dd id="out-dof">—</dd></div>
         </dl>
+        <details class="focus-stack" id="focus-stack">
+          <summary>Plan a focus stack</summary>
+          <div class="focus-stack-body">
+            <div class="focus-stack-fields">
+              <label class="field">
+                <span>Depth to cover</span>
+                <span class="input-with-unit">
+                  <input id="stack-depth" type="number" min="0.1" step="10" value="1000" inputmode="decimal" aria-describedby="stack-help">
+                  <select id="stack-depth-unit" aria-label="Depth unit">
+                    <option value="um" selected>µm</option>
+                    <option value="mm">mm</option>
+                  </select>
+                </span>
+              </label>
+              <label class="field">
+                <span>Focus overlap</span>
+                <span class="input-with-suffix">
+                  <input id="stack-overlap" type="number" min="0" max="90" step="5" value="50" inputmode="numeric" aria-describedby="stack-help">
+                  <span aria-hidden="true">%</span>
+                </span>
+              </label>
+            </div>
+            <dl class="focus-stack-results" aria-live="polite">
+              <div><dt>Focus spacing</dt><dd id="out-stack-spacing">—</dd></div>
+              <div><dt>Estimated frames</dt><dd id="out-stack-frames">—</dd></div>
+            </dl>
+            <p class="focus-stack-help" id="stack-help">Uses the current 2-source-pixel DOF. Spacing is object-space movement for a rail or moving subject; camera focus-step values are not equivalent. Final downscaling may permit fewer frames.</p>
+          </div>
+        </details>
         <p class="status" id="status" role="status" aria-live="polite"></p>
       </aside>
     </section>
